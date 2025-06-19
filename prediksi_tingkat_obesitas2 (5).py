@@ -20,14 +20,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
 
-# --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN) ---
-# Menggunakan HTML/CSS untuk kustomisasi dasar tema kesehatan
+# --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN DAN VISIBILITAS FONT) ---
 st.html("""
 <style>
     /* Warna primer: hijau sehat, latar belakang: putih, sekunder: hijau muda */
     .stApp {
         background-color: #f0fdf4; /* Background putih kehijauan muda */
-        color: #1f2937; /* Teks gelap */
+        color: #1a202c; /* Teks lebih gelap untuk visibilitas yang lebih baik */
     }
     .stButton>button {
         background-color: #059669; /* Hijau tua */
@@ -41,6 +40,11 @@ st.html("""
     }
     .stButton>button:hover {
         background-color: #047857; /* Hijau lebih gelap saat hover */
+    }
+    /* Memastikan label input terlihat jelas */
+    .stNumberInput label, .stSelectbox label, .stTextInput label, .stDateInput label {
+        color: #065f46; /* Warna hijau gelap untuk label input */
+        font-weight: bold; /* Membuat label lebih tebal */
     }
     .stSelectbox>div>div {
         border-radius: 8px;
@@ -76,11 +80,6 @@ st.html("""
 """)
 
 # --- LOGO APLIKASI ---
-# Ganti URL ini dengan URL logo Anda sendiri atau upload file logo ke folder proyek Anda
-# Contoh: Jika Anda memiliki 'logo_kesehatan.png' di folder yang sama:
-# from PIL import Image
-# image = Image.open('logo_kesehatan.png')
-# st.image(image, width=150)
 st.image("https://raw.githubusercontent.com/streamlit/docs/main/docs/static/logo.svg", width=150) # Placeholder logo Streamlit
 
 
@@ -188,22 +187,22 @@ else:
 # --- BAGIAN INPUT DATA UNTUK PREDIKSI ---
 st.header("Input Data")
 # Menghapus parameter 'value' agar tidak ada nilai praterisi, akan default ke min_value
-age = st.number_input("Usia (tahun)", min_value=0, max_value=120)
+age = st.number_input("🎂 Usia (tahun)", min_value=0, max_value=120)
 # Menambahkan opsi "Pilih..." di awal dan mengatur index ke 0
-gender = st.selectbox("Jenis Kelamin", ["Pilih...", "Male", "Female"], index=0)
+gender = st.selectbox("🚻 Jenis Kelamin", ["Pilih...", "Male", "Female"], index=0)
 # Satuan Tinggi Badan diubah ke sentimeter
-height_cm = st.number_input("Tinggi Badan (cm)", min_value=50, max_value=250)
-weight = st.number_input("Berat Badan (kg)", min_value=30, max_value=250)
-family_history = st.selectbox("Apakah ada riwayat keluarga yang mengalami kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
-FAVC = st.selectbox("Sering mengonsumsi makanan tinggi kalori?", ["Pilih...", "Ya", "Tidak"], index=0)
-FCVC = st.number_input("Frekuensi mengonsumsi sayuran (dalam sekali makan)", min_value=1, max_value=5)
-NCP = st.number_input("Jumlah makan besar dalam sehari", min_value=1, max_value=10)
-SMOKE = st.selectbox("Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
-CH2O = st.number_input("Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
-FAF = st.number_input("Frekuensi aktivitas fisik (dalam sekali seminggu)", min_value=0, max_value=7)
-CAEC = st.selectbox("Konsumsi makanan antara waktu makan utama", ["Pilih...", "Always", "Frequently", "Sometimes", "no"], index=0)
-MTRANS = st.selectbox("Transportasi utama", ["Pilih...", "Public_Transportation", "Automobile", "Walking", "Motorbike", "Bike"], index=0)
-TUE = st.number_input("Penggunaan gawai (jam)", min_value=0.0, max_value=24.0)
+height_cm = st.number_input("📏 Tinggi Badan (cm)", min_value=50, max_value=250)
+weight = st.number_input("⚖️ Berat Badan (kg)", min_value=30, max_value=250)
+family_history = st.selectbox("👨‍👩‍👧‍👦 Riwayat keluarga kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
+FAVC = st.selectbox("🍔 Sering mengonsumsi makanan tinggi kalori?", ["Pilih...", "Ya", "Tidak"], index=0)
+FCVC = st.number_input("🥕 Frekuensi mengonsumsi sayuran (sekali makan)", min_value=1, max_value=5)
+NCP = st.number_input("🍽️ Jumlah makan besar dalam sehari", min_value=1, max_value=10)
+SMOKE = st.selectbox("🚬 Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
+CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
+FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
+CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Always", "Frequently", "Sometimes", "no"], index=0)
+MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Public_Transportation", "Automobile", "Walking", "Motorbike", "Bike"], index=0)
+TUE = st.number_input("📱 Penggunaan gawai (jam)", min_value=0.0, max_value=24.0)
 
 # Tombol untuk memprediksi
 if st.button("Prediksi"):
@@ -212,7 +211,7 @@ if st.button("Prediksi"):
 
     # Validasi input untuk selectbox yang memiliki "Pilih..."
     if "Pilih..." in [gender, family_history, FAVC, SMOKE, CAEC, MTRANS]:
-        st.warning("Mohon lengkapi semua pilihan yang tersedia.")
+        st.warning("Mohon lengkapi semua pilihan yang tersedia sebelum memprediksi.")
     elif not trained_models:
         st.error("Model belum dilatih karena data kosong atau terjadi error.")
     else:
@@ -225,11 +224,11 @@ if st.button("Prediksi"):
             'Gender': gender,
             'Height': height_m, # Gunakan tinggi badan dalam meter
             'Weight': weight,
-            'CALC': 'Sometimes', # CALC, SCC harus diisi nilai default karena tidak ada input
+            'CALC': 'Sometimes', # CALC, SCC diisi nilai default karena tidak ada input langsung
             'FAVC': FAVC,
             'FCVC': FCVC,
             'NCP': NCP,
-            'SCC': 'no', # SCC belum ada di input, diisi default
+            'SCC': 'no', # SCC diisi default
             'SMOKE': SMOKE,
             'CH2O': CH2O,
             'family_history_with_overweight': family_history,
