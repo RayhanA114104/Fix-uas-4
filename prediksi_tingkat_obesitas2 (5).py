@@ -23,7 +23,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 # --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN DAN VISIBILITAS FONT YANG JELAS) ---
 st.html("""
 <style>
-    /* Tema Umum: Latar belakang putih bersih untuk kontras maksimal */
+    /* Warna primer: hijau sehat, latar belakang: putih, sekunder: hijau muda */
     .stApp {
         background-color: #FFFFFF; /* Latar belakang putih murni */
         color: #333333; /* Teks default abu-abu gelap */
@@ -57,21 +57,17 @@ st.html("""
     }
     /* Kotak Hasil Prediksi (st.success) */
     .stSuccess {
-        background-color: #d1fae5; /* Background hijau muda untuk sukses */
-        color: #1a202c; /* Teks sangat gelap, hampir hitam */
+        background-color: #065f46; /* Ganti background menjadi hijau gelap */
+        color: #FFFFFF; /* Ganti warna teks menjadi putih */
         border-radius: 12px;
         padding: 20px;
         font-size: 1.8em;
         font-weight: 900;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        border: 2px solid #059669;
-        /* Efek Tepi Garis Font (Outline) */
-        text-shadow:
-            -1px -1px 0 #ffffff,
-             1px -1px 0 #ffffff,
-            -1px  1px 0 #ffffff,
-             1px  1px 0 #ffffff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4); /* Bayangan lebih kuat untuk kontras */
+        border: 2px solid #059669; /* Border hijau tebal */
+        /* Hapus text-shadow karena teks putih di latar gelap sudah sangat jelas */
+        text-shadow: none;
     }
     /* Kotak Keterangan Detail Prediksi */
     .prediction-detail-box {
@@ -88,9 +84,9 @@ st.html("""
     .prediction-detail-box strong {
         color: #00332c;
     }
-    /* Kotak Peringatan (st.warning) */
+
     .stWarning {
-        background-color: #fef3c7;
+        background-color: #fef3c7; /* Background kuning muda untuk peringatan */
         color: #92400e;
         border-radius: 8px;
         padding: 10px;
@@ -134,19 +130,23 @@ if 'prediction_made' not in st.session_state:
     st.session_state.prediction_made = False
 
 # --- PEMUATAN DATA DAN PRA-PEMROSESAN (HANYA SEKALI DI AWAL) ---
-@st.cache_data
+@st.cache_data # Menggunakan cache_data untuk menghindari pemrosesan ulang setiap kali interaksi Streamlit
 def load_and_preprocess_data(file_path):
     data = pd.read_csv(file_path)
 
+    # Coerce problematic columns to numeric, setting errors to NaN
     columns_to_coerce = ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']
     for col in columns_to_coerce:
         data[col] = pd.to_numeric(data[col], errors='coerce')
 
+    # Tangani nilai yang hilang dengan mengisi median untuk kolom numerik saja
     numeric_cols = data.select_dtypes(include=np.number).columns
     data[numeric_cols] = data[numeric_cols].fillna(data[numeric_cols].median())
 
+    # Tangani duplikat
     data.drop_duplicates(inplace=True)
 
+    # Tangani outlier menggunakan IQR untuk kolom 'Weight'
     Q1_weight = data['Weight'].quantile(0.25)
     Q3_weight = data['Weight'].quantile(0.75)
     IQR_weight = Q3_weight - Q1_weight
@@ -157,6 +157,7 @@ def load_and_preprocess_data(file_path):
         st.warning(f"Peringatan: Setelah penghapusan outlier, dataset menjadi kosong dari {initial_rows} baris. Visualisasi mungkin tidak tersedia.")
         return pd.DataFrame(), np.array([]), np.array([]), None, [], []
 
+    # Lakukan get_dummies pada seluruh data untuk memastikan konsistensi kolom
     full_data_encoded = pd.get_dummies(data, drop_first=True)
 
     target_columns_encoded = [col for col in full_data_encoded.columns if col.startswith('NObeyesdad_')]
@@ -164,11 +165,14 @@ def load_and_preprocess_data(file_path):
 
     target_labels_for_smote = full_data_encoded[target_columns_encoded].idxmax(axis=1).apply(lambda x: x.replace('NObeyesdad_', ''))
 
+    # Simpan daftar kolom fitur yang sudah di-one-hot-encoded
     all_training_features_columns = features.columns.tolist()
 
+    # Atasi ketidakseimbangan kelas data menggunakan SMOTE
     smote = SMOTE(random_state=42)
     features_resampled, target_resampled = smote.fit_resample(features, target_labels_for_smote)
 
+    # Normalisasi atau Standarisasi Data
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features_resampled)
 
@@ -178,7 +182,7 @@ def load_and_preprocess_data(file_path):
 data_original_for_viz, features_scaled, target_resampled, scaler, all_training_features_columns, numeric_cols_for_viz = load_and_preprocess_data('ObesityDataSet.csv')
 
 # --- PELATIHAN MODEL (Dijalankan sekali saat aplikasi dimulai) ---
-@st.cache_resource
+@st.cache_resource # Menggunakan cache_resource untuk menyimpan model yang dilatih
 def train_models(X_train_data, y_train_data):
     models = {
         'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
@@ -191,6 +195,7 @@ def train_models(X_train_data, y_train_data):
         model.fit(X_train_data, y_train_data)
         trained_models[name] = model
 
+    # Hyperparameter Tuning untuk Random Forest
     param_grid = {
         'n_estimators': [50, 100],
         'max_depth': [None, 10, 20],
@@ -227,7 +232,6 @@ CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", mi
 FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
 CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Selalu", "Sering", "Terkadang", "Tidak"], index=0)
 MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
-# TUE diubah satuannya ke menit, dan label diperjelas
 TUE_menit = st.number_input("📱 Durasi penggunaan gawai (menit): Durasi Anda menggunakan perangkat teknologi atau gawai (menonton TV, komputer, game)", min_value=0, max_value=1440)
 
 
@@ -507,7 +511,7 @@ if st.session_state.prediction_made:
 
 
 # --- KESIMPULAN ---
-st.header("Keterangan")
+st.header("Kesimpulan")
 st.markdown("""
 Aplikasi ini memberikan estimasi tingkat obesitas berdasarkan input yang diberikan.
 Silakan masukkan data Anda untuk melihat hasil prediksi.
