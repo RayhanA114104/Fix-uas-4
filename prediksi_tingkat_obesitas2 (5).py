@@ -148,19 +148,15 @@ if 'prediction_made' not in st.session_state:
 def load_and_preprocess_data(file_path):
     data = pd.read_csv(file_path)
 
-    # Coerce problematic columns to numeric, setting errors to NaN
     columns_to_coerce = ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']
     for col in columns_to_coerce:
         data[col] = pd.to_numeric(data[col], errors='coerce')
 
-    # Tangani nilai yang hilang dengan mengisi median untuk kolom numerik saja
     numeric_cols = data.select_dtypes(include=np.number).columns
     data[numeric_cols] = data[numeric_cols].fillna(data[numeric_cols].median())
 
-    # Tangani duplikat
     data.drop_duplicates(inplace=True)
 
-    # Tangani outlier menggunakan IQR untuk kolom 'Weight'
     Q1_weight = data['Weight'].quantile(0.25)
     Q3_weight = data['Weight'].quantile(0.75)
     IQR_weight = Q3_weight - Q1_weight
@@ -171,7 +167,6 @@ def load_and_preprocess_data(file_path):
         st.warning(f"Peringatan: Setelah penghapusan outlier, dataset menjadi kosong dari {initial_rows} baris. Visualisasi mungkin tidak tersedia.")
         return pd.DataFrame(), np.array([]), np.array([]), None, [], []
 
-    # Lakukan get_dummies pada seluruh data untuk memastikan konsistensi kolom
     full_data_encoded = pd.get_dummies(data, drop_first=True)
 
     target_columns_encoded = [col for col in full_data_encoded.columns if col.startswith('NObeyesdad_')]
@@ -179,14 +174,11 @@ def load_and_preprocess_data(file_path):
 
     target_labels_for_smote = full_data_encoded[target_columns_encoded].idxmax(axis=1).apply(lambda x: x.replace('NObeyesdad_', ''))
 
-    # Simpan daftar kolom fitur yang sudah di-one-hot-encoded
     all_training_features_columns = features.columns.tolist()
 
-    # Atasi ketidakseimbangan kelas data menggunakan SMOTE
     smote = SMOTE(random_state=42)
     features_resampled, target_resampled = smote.fit_resample(features, target_labels_for_smote)
 
-    # Normalisasi atau Standarisasi Data
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features_resampled)
 
@@ -234,20 +226,33 @@ else:
 # --- BAGIAN INPUT DATA UNTUK PREDIKSI ---
 st.header("Input Data")
 age = st.number_input("🎂 Usia (tahun)", min_value=0, max_value=120)
-gender = st.selectbox("🚻 Jenis Kelamin", ["Pilih...", "Laki-laki", "Perempuan"], index=0)
+gender_choice = st.selectbox("🚻 Jenis Kelamin", ["Pilih...", "Laki-laki", "Perempuan"], index=0)
 height_cm = st.number_input("📏 Tinggi Badan (cm)", min_value=50, max_value=250)
 weight = st.number_input("⚖️ Berat Badan (kg)", min_value=30, max_value=250)
-family_history = st.selectbox("👨‍👩‍👧‍👦 Riwayat keluarga kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
-FAVC = st.selectbox("🍔 Sering mengonsumsi makanan tinggi kalori?", ["Pilih...", "Ya", "Tidak"], index=0)
+family_history_choice = st.selectbox("👨‍👩‍👧‍👦 Riwayat keluarga kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
+FAVC_choice = st.selectbox("🍔 Sering mengonsumsi makanan tinggi kalori?", ["Pilih...", "Ya", "Tidak"], index=0)
 FCVC = st.number_input("🥕 Frekuensi mengonsumsi sayuran (sekali makan)", min_value=1, max_value=5)
 NCP = st.number_input("🍽️ Jumlah makan besar dalam sehari", min_value=1, max_value=10)
-SMOKE = st.selectbox("🚬 Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
+SMOKE_choice = st.selectbox("🚬 Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
 CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
 FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
-CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Selalu", "Sering", "Terkadang", "Tidak"], index=0)
-MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
-# TUE diubah satuannya ke menit, dan label diperjelas
+CAEC_choice = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Selalu", "Sering", "Terkadang", "Tidak"], index=0)
+MTRANS_choice = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
 TUE_menit = st.number_input("📱 Durasi penggunaan gawai (menit): Durasi Anda menggunakan perangkat teknologi atau gawai (menonton TV, komputer, game)", min_value=0, max_value=1440)
+
+
+# --- MAPPING PILIHAN BAHASA INDONESIA KE NILAI DATASET ASLI ---
+gender_map = {"Laki-laki": "Male", "Perempuan": "Female", "Pilih...": ""}
+yes_no_map = {"Ya": "yes", "Tidak": "no", "Pilih...": ""}
+caec_map = {"Selalu": "Always", "Sering": "Frequently", "Terkadang": "Sometimes", "Tidak": "no", "Pilih...": ""}
+mtrans_map = {
+    "Transportasi Umum": "Public_Transportation",
+    "Mobil Pribadi": "Automobile",
+    "Jalan Kaki": "Walking",
+    "Sepeda Motor": "Motorbike",
+    "Sepeda": "Bike",
+    "Pilih...": ""
+}
 
 
 # Tombol untuk memprediksi
@@ -256,7 +261,7 @@ if st.button("Prediksi"):
     st.session_state.prediction_made = True
 
     # Validasi input untuk selectbox yang memiliki "Pilih..."
-    if "Pilih..." in [gender, family_history, FAVC, SMOKE, CAEC, MTRANS]:
+    if "Pilih..." in [gender_choice, family_history_choice, FAVC_choice, SMOKE_choice, CAEC_choice, MTRANS_choice]:
         st.warning("Mohon lengkapi semua pilihan yang tersedia sebelum memprediksi.")
     elif not trained_models:
         st.error("Model belum dilatih karena data kosong atau terjadi error.")
@@ -266,24 +271,32 @@ if st.button("Prediksi"):
         # Konversi durasi gawai dari menit ke jam
         TUE_jam = TUE_menit / 60.0
 
-        # Buat DataFrame input dari data yang dimasukkan pengguna
+        # Menerapkan mapping ke nilai asli dataset
+        gender_mapped = gender_map.get(gender_choice)
+        family_history_mapped = yes_no_map.get(family_history_choice)
+        FAVC_mapped = yes_no_map.get(FAVC_choice)
+        SMOKE_mapped = yes_no_map.get(SMOKE_choice)
+        CAEC_mapped = caec_map.get(CAEC_choice)
+        MTRANS_mapped = mtrans_map.get(MTRANS_choice)
+
+        # Buat DataFrame input dari data yang dimasukkan pengguna (menggunakan nilai yang sudah dipetakan)
         input_data_df = pd.DataFrame([{
             'Age': age,
-            'Gender': gender,
-            'Height': height_m, # Gunakan tinggi badan dalam meter
+            'Gender': gender_mapped,
+            'Height': height_m,
             'Weight': weight,
-            'CALC': 'Sometimes', # CALC, SCC diisi nilai default karena tidak ada input langsung
-            'FAVC': FAVC,
+            'CALC': 'Sometimes', # CALC diisi nilai default karena tidak ada input langsung
+            'FAVC': FAVC_mapped,
             'FCVC': FCVC,
             'NCP': NCP,
             'SCC': 'no', # SCC diisi default
-            'SMOKE': SMOKE,
+            'SMOKE': SMOKE_mapped,
             'CH2O': CH2O,
-            'family_history_with_overweight': family_history,
+            'family_history_with_overweight': family_history_mapped,
             'FAF': FAF,
-            'TUE': TUE_jam, # Gunakan TUE dalam jam
-            'CAEC': CAEC,
-            'MTRANS': MTRANS
+            'TUE': TUE_jam,
+            'CAEC': CAEC_mapped,
+            'MTRANS': MTRANS_mapped
         }])
 
         # Konversi kolom numerik di input_data_df
@@ -312,7 +325,6 @@ if st.button("Prediksi"):
         prediction = trained_models['Best Random Forest (Tuned)'].predict(input_data_scaled)[0]
 
         # Mapping hasil prediksi ke Bahasa Indonesia
-        # Kunci-kunci ini harus sesuai PERSIS dengan output string model (dengan underscore)
         prediction_mapping = {
             "Normal_Weight": "Berat Badan Normal",
             "Overweight_Level_I": "Kelebihan Berat Badan Tingkat I",
@@ -322,9 +334,9 @@ if st.button("Prediksi"):
             "Obesity_Type_III": "Obesitas Tipe III",
             "Insufficient_Weight": "Berat Badan Kurang"
         }
-        translated_prediction = prediction_mapping.get(prediction, "Tidak Diketahui") # Fallback to "Tidak Diketahui" if not found
+        translated_prediction = prediction_mapping.get(prediction, "Tidak Diketahui")
 
-        st.success(f"✨ Hasil Prediksi: {translated_prediction}") # Tambah emoji di sini
+        st.success(f"✨ Hasil Prediksi: {translated_prediction}")
 
         # Keterangan hasil yang didapat setelah diprediksi
         if translated_prediction == "Berat Badan Normal":
