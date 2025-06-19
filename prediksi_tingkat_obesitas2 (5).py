@@ -20,21 +20,21 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
 
-# --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN DAN VISIBILITAS FONT YANG JELAS) ---
+# --- PENGATURAN TAMPILAN UI (TEMA GELAP DENGAN FONT MENCOLOK) ---
 st.html("""
 <style>
-    /* Warna primer: hijau sehat, latar belakang: putih, sekunder: hijau muda */
+    /* Tema Gelap Keseluruhan */
     .stApp {
-        background-color: #FFFFFF; /* Latar belakang putih murni */
-        color: #333333; /* Teks default abu-abu gelap */
+        background-color: #1a1a2e; /* Latar belakang sangat gelap (dark blue/purple) */
+        color: #e0e0e0; /* Teks default abu-abu sangat terang */
     }
     /* Judul dan Sub-judul */
     h1, h2, h3 {
-        color: #044A42; /* Hijau gelap yang mendalam */
+        color: #64FFDA; /* Cyan terang yang sangat mencolok */
     }
     /* Tombol */
     .stButton>button {
-        background-color: #059669; /* Hijau tua */
+        background-color: #087F23; /* Hijau cerah untuk tombol */
         color: white;
         border-radius: 8px;
         border: none;
@@ -44,64 +44,78 @@ st.html("""
         transition: background-color 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #047857; /* Hijau lebih gelap saat hover */
+        background-color: #065f46; /* Hijau lebih gelap saat hover */
     }
     /* Input Fields (Number Input, Selectbox, dll.) */
     .stNumberInput label, .stSelectbox label, .stTextInput label, .stDateInput label {
-        color: #044A42; /* Warna hijau gelap untuk label input */
-        font-weight: bold; /* Membuat label lebih tebal */
+        color: #64FFDA; /* Cyan terang untuk label input */
+        font-weight: bold;
     }
     .stSelectbox>div>div, .stNumberInput>div>div {
+        background-color: #2b3a50; /* Latar belakang input sedikit lebih terang dari app background */
         border-radius: 8px;
-        border: 1px solid #d1d5db; /* Border abu-abu */
+        border: 1px solid #4a6c8e; /* Border yang terlihat jelas */
+        color: #e0e0e0; /* Teks input terang */
     }
+    .stSelectbox div[data-baseweb="select"] div[data-original-value] {
+        color: #e0e0e0; /* Memastikan teks yang dipilih di selectbox terlihat */
+    }
+    .stNumberInput div[data-testid="stNumberInputIncrementDecrementButtons"] {
+        background-color: #2b3a50; /* Memastikan tombol +/- di number input juga cocok */
+    }
+    .stTextInput input, .stNumberInput input {
+        background-color: #2b3a50; /* Latar belakang input text/number */
+        color: #e0e0e0; /* Warna teks di dalam input */
+    }
+
     /* Kotak Hasil Prediksi (st.success) */
     .stSuccess {
-        background-color: #065f46; /* Ganti background menjadi hijau gelap */
-        color: #FFFFFF; /* Ganti warna teks menjadi putih */
+        background-color: #044A42; /* Hijau gelap sebagai latar belakang kotak prediksi */
+        color: #FFD700; /* KUNING EMAS YANG SANGAT MENCOLOK untuk teks hasil */
         border-radius: 12px;
         padding: 20px;
         font-size: 1.8em;
         font-weight: 900;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4); /* Bayangan lebih kuat untuk kontras */
-        border: 2px solid #059669; /* Border hijau tebal */
-        /* Hapus text-shadow karena teks putih di latar gelap sudah sangat jelas */
-        text-shadow: none;
+        box-shadow: 0 6px 15px rgba(0,0,0,0.6); /* Bayangan kuat */
+        border: 2px solid #64FFDA; /* Border cyan terang */
+        text-shadow: none; /* Tidak perlu text-shadow lagi */
     }
     /* Kotak Keterangan Detail Prediksi */
     .prediction-detail-box {
-        background-color: #e0f2f7; /* Background biru muda */
+        background-color: #2b3e50; /* Latar belakang biru-abu gelap */
         padding: 15px;
         border-radius: 8px;
         margin-top: 15px;
-        border: 1px solid #a7d9f2;
+        border: 1px solid #4a6c8e;
     }
     .prediction-detail-box p {
         font-size: 1.0em;
-        color: #004d40;
+        color: #e0e0e0; /* Teks terang */
     }
     .prediction-detail-box strong {
-        color: #00332c;
+        color: #64FFDA; /* Penekanan dengan cyan terang */
     }
 
+    /* Kotak Peringatan (st.warning) */
     .stWarning {
-        background-color: #fef3c7; /* Background kuning muda untuk peringatan */
-        color: #92400e;
+        background-color: rgba(255, 165, 0, 0.4); /* Oranye transparan */
+        color: white; /* Teks putih */
         border-radius: 8px;
         padding: 10px;
+        border: 1px solid orange;
     }
     /* Kotak Informasi dan Penjelasan Visualisasi */
     div[data-testid="stMarkdownContainer"] > div > div {
-        background-color: #f5f5f5; /* Background abu-abu muda */
+        background-color: #2b3e50; /* Latar belakang gelap */
         padding: 10px;
         border-radius: 5px;
         margin-bottom: 10px;
-        color: #4b5563; /* Teks abu-abu gelap */
+        color: #e0e0e0; /* Teks terang */
     }
     div[data-testid="stMarkdownContainer"] > div > div p {
         font-size: 0.9em;
-        color: #4b5563;
+        color: #e0e0e0;
     }
     /* Mengatur lebar container utama */
     .block-container {
@@ -232,6 +246,7 @@ CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", mi
 FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
 CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Selalu", "Sering", "Terkadang", "Tidak"], index=0)
 MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
+# TUE diubah satuannya ke menit, dan label diperjelas
 TUE_menit = st.number_input("📱 Durasi penggunaan gawai (menit): Durasi Anda menggunakan perangkat teknologi atau gawai (menonton TV, komputer, game)", min_value=0, max_value=1440)
 
 
