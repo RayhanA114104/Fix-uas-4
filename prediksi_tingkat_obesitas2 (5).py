@@ -34,7 +34,7 @@ def load_and_preprocess_data(file_path):
     data = pd.read_csv(file_path)
 
     # Coerce problematic columns to numeric, setting errors to NaN
-    columns_to_coerce = ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE'] # Tambahkan TUE juga karena bisa ada '?'
+    columns_to_coerce = ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']
     for col in columns_to_coerce:
         data[col] = pd.to_numeric(data[col], errors='coerce')
 
@@ -45,30 +45,19 @@ def load_and_preprocess_data(file_path):
     # Tangani duplikat
     data.drop_duplicates(inplace=True)
 
-    # Tangani outlier menggunakan IQR untuk kolom 'Weight' (dapat diperluas ke kolom numerik lain jika diperlukan)
+    # Tangani outlier menggunakan IQR untuk kolom 'Weight'
     Q1_weight = data['Weight'].quantile(0.25)
     Q3_weight = data['Weight'].quantile(0.75)
     IQR_weight = Q3_weight - Q1_weight
+
+    # Penting: Pastikan DataFrame tidak menjadi kosong setelah outlier removal
+    initial_rows = data.shape[0]
     data = data[(data['Weight'] >= (Q1_weight - 1.5 * IQR_weight)) & (data['Weight'] <= (Q3_weight + 1.5 * IQR_weight))]
-
-    # Konversi data kategori menjadi numerik menggunakan one-hot encoding
-    # Simpan nama kolom asli sebelum one-hot encoding untuk target
-    original_target_col = 'NObeyesdad'
-    # Jika NObeyesdad tidak ada, atau sudah di-one-hot-encoding oleh pd.read_csv (jarang)
-    # Anda perlu memastikan kolom ini tidak di-one-hot-encoding dua kali
-
-    data_processed = pd.get_dummies(data.drop(columns=[original_target_col]), drop_first=True)
-    # Tambahkan kembali kolom target asli sebelum SMOTE
-    data_processed[original_target_col] = data[original_target_col]
-
-
-    # Tentukan fitur dan target
-    # target_columns = [col for col in data_processed.columns if col.startswith('NObeyesdad_')]
-    # Asumsikan 'NObeyesdad' adalah kolom target tunggal sebelum di-one-hot-encoding secara internal oleh SMOTE atau model
-    # Jika NObeyesdad di-one-hot-encoding oleh get_dummies, kita harus merekonstruksi target tunggal
-
-    # Rekonstruksi target_labels dari kolom one-hot-encoded yang akan dibuat oleh get_dummies untuk features
-    # Cara paling aman adalah get_dummies pada seluruh data, lalu pilih kolom fitur dan target
+    if data.empty:
+        st.warning(f"Peringatan: Setelah penghapusan outlier, dataset menjadi kosong dari {initial_rows} baris. Visualisasi mungkin tidak tersedia.")
+        # Jika data kosong, mungkin perlu strategi penanganan yang berbeda untuk menghindari error di tahap selanjutnya
+        # Misalnya, mengembalikan DataFrame kosong dan menanganinya di fungsi plotting
+        return pd.DataFrame(), [], [], None, [], [] # Mengembalikan nilai kosong/default
 
     # Lakukan get_dummies pada seluruh data untuk memastikan konsistensi kolom
     full_data_encoded = pd.get_dummies(data, drop_first=True)
@@ -76,9 +65,7 @@ def load_and_preprocess_data(file_path):
     target_columns_encoded = [col for col in full_data_encoded.columns if col.startswith('NObeyesdad_')]
     features = full_data_encoded.drop(columns=target_columns_encoded)
 
-    # Target untuk SMOTE harus berupa series categorical, bukan one-hot encoded DataFrame
     target_labels_for_smote = full_data_encoded[target_columns_encoded].idxmax(axis=1).apply(lambda x: x.replace('NObeyesdad_', ''))
-
 
     # Simpan daftar kolom fitur yang sudah di-one-hot-encoded
     all_training_features_columns = features.columns.tolist()
@@ -98,12 +85,7 @@ data_original_for_viz, features_scaled, target_resampled, scaler, all_training_f
 
 # --- PELATIHAN MODEL (Dijalankan sekali saat aplikasi dimulai) ---
 @st.cache_resource # Menggunakan cache_resource untuk menyimpan model yang dilatih
-def train_models(X_train, y_train):
-    # Split data (jika perlu dilakukan di dalam fungsi yang di-cache_resource)
-    # Namun, karena kita sudah punya features_scaled dan target_resampled dari load_and_preprocess_data,
-    # kita bisa split di luar fungsi ini dan mengirimkan X_train, y_train langsung.
-    # Untuk memastikan reproducibility training, split juga harus punya random_state
-
+def train_models(X_train_data, y_train_data):
     # Inisialisasi model
     models = {
         'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
@@ -113,7 +95,7 @@ def train_models(X_train, y_train):
 
     trained_models = {}
     for name, model in models.items():
-        model.fit(X_train, y_train)
+        model.fit(X_train_data, y_train_data)
         trained_models[name] = model
 
     # Hyperparameter Tuning untuk Random Forest
@@ -122,17 +104,23 @@ def train_models(X_train, y_train):
         'max_depth': [None, 10, 20],
     }
     grid_search = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=3)
-    grid_search.fit(X_train, y_train)
+    grid_search.fit(X_train_data, y_train_data)
     best_model = grid_search.best_estimator_
     trained_models['Best Random Forest (Tuned)'] = best_model
 
     return trained_models
 
-# Lakukan split data untuk pelatihan model
-X_train, X_test, y_train, y_test = train_test_split(features_scaled, target_resampled, test_size=0.2, random_state=42)
+# Lakukan split data untuk pelatihan model, pastikan data tidak kosong
+if not isinstance(features_scaled, pd.DataFrame) and features_scaled.size == 0: # Check if it's an empty numpy array/list
+    st.error("Data untuk pelatihan model kosong setelah pra-pemrosesan. Tidak dapat melatih model.")
+    # Inisialisasi variabel yang diperlukan agar bagian kode selanjutnya tidak error
+    X_train, X_test, y_train, y_test = np.array([]), np.array([]), np.array([]), np.array([])
+    trained_models = {} # Set models to empty if no training possible
+else:
+    X_train, X_test, y_train, y_test = train_test_split(features_scaled, target_resampled, test_size=0.2, random_state=42)
+    # Latih model
+    trained_models = train_models(X_train, y_train)
 
-# Latih model
-trained_models = train_models(X_train, y_train)
 
 # --- BAGIAN INPUT DATA UNTUK PREDIKSI ---
 st.header("Input Data")
@@ -147,62 +135,63 @@ NCP = st.number_input("Jumlah makan besar dalam sehari", min_value=1, max_value=
 SMOKE = st.selectbox("Apakah Anda merokok?", ["Ya", "Tidak"])
 CH2O = st.number_input("Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0, value=2.0)
 FAF = st.number_input("Frekuensi aktivitas fisik (dalam sekali seminggu)", min_value=0, max_value=7, value=1)
-# Kolom CAEC dan MTRANS juga ada di dataset, perlu ditambahkan ke input
 CAEC = st.selectbox("Konsumsi makanan antara waktu makan utama", ["Always", "Frequently", "Sometimes", "no"])
 MTRANS = st.selectbox("Transportasi utama", ["Public_Transportation", "Automobile", "Walking", "Motorbike", "Bike"])
 TUE = st.number_input("Penggunaan gawai (jam)", min_value=0.0, max_value=24.0, value=1.0) # Contoh TUE, asumsikan numerik
 
 # Tombol untuk memprediksi
 if st.button("Prediksi"):
-    # Buat DataFrame input dari data yang dimasukkan pengguna
-    input_data_df = pd.DataFrame([{
-        'Age': age,
-        'Gender': gender,
-        'Height': height,
-        'Weight': weight,
-        'CALC': 'Sometimes', # CALC, SCC, family_history_with_overweight, TUE, CAEC, MTRANS
-        'FAVC': FAVC,
-        'FCVC': FCVC,
-        'NCP': NCP,
-        'SCC': 'no', # SCC belum ada di input, diisi default
-        'SMOKE': SMOKE,
-        'CH2O': CH2O,
-        'family_history_with_overweight': family_history,
-        'FAF': FAF,
-        'TUE': TUE,
-        'CAEC': CAEC,
-        'MTRANS': MTRANS
-    }])
+    if not trained_models:
+        st.error("Model belum dilatih karena data kosong atau terjadi error.")
+    else:
+        # Buat DataFrame input dari data yang dimasukkan pengguna
+        input_data_df = pd.DataFrame([{
+            'Age': age,
+            'Gender': gender,
+            'Height': height,
+            'Weight': weight,
+            'CALC': 'Sometimes', # CALC, SCC, TUE harus diisi nilai default atau input
+            'FAVC': FAVC,
+            'FCVC': FCVC,
+            'NCP': NCP,
+            'SCC': 'no', # SCC belum ada di input, diisi default
+            'SMOKE': SMOKE,
+            'CH2O': CH2O,
+            'family_history_with_overweight': family_history,
+            'FAF': FAF,
+            'TUE': TUE,
+            'CAEC': CAEC,
+            'MTRANS': MTRANS
+        }])
 
-    # Konversi kolom numerik di input_data_df yang mungkin masih object karena st.number_input
-    # ini penting agar scaler bekerja
-    for col in ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']:
-        input_data_df[col] = pd.to_numeric(input_data_df[col], errors='coerce')
+        # Konversi kolom numerik di input_data_df yang mungkin masih object karena st.number_input
+        for col in ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']:
+            input_data_df[col] = pd.to_numeric(input_data_df[col], errors='coerce')
 
 
-    # Lakukan one-hot encoding pada input_data_df
-    input_data_encoded = pd.get_dummies(input_data_df, drop_first=True)
+        # Lakukan one-hot encoding pada input_data_df
+        input_data_encoded = pd.get_dummies(input_data_df, drop_first=True)
 
-    # Sesuaikan kolom input_data_encoded dengan kolom fitur pelatihan
-    # Tambahkan kolom yang hilang dengan nilai 0
-    for col in all_training_features_columns:
-        if col not in input_data_encoded.columns:
-            input_data_encoded[col] = 0
-    # Hapus kolom yang tidak ada di data pelatihan
-    for col in input_data_encoded.columns:
-        if col not in all_training_features_columns:
-            input_data_encoded = input_data_encoded.drop(columns=[col])
+        # Sesuaikan kolom input_data_encoded dengan kolom fitur pelatihan
+        # Tambahkan kolom yang hilang dengan nilai 0
+        for col in all_training_features_columns:
+            if col not in input_data_encoded.columns:
+                input_data_encoded[col] = 0
+        # Hapus kolom yang tidak ada di data pelatihan
+        for col in input_data_encoded.columns:
+            if col not in all_training_features_columns:
+                input_data_encoded = input_data_encoded.drop(columns=[col])
 
-    # Pastikan urutan kolom sesuai dengan data pelatihan
-    input_data_aligned = input_data_encoded[all_training_features_columns]
+        # Pastikan urutan kolom sesuai dengan data pelatihan
+        input_data_aligned = input_data_encoded[all_training_features_columns]
 
-    # Skalakan data input
-    input_data_scaled = scaler.transform(input_data_aligned)
+        # Skalakan data input
+        input_data_scaled = scaler.transform(input_data_aligned)
 
-    # Lakukan prediksi menggunakan model terbaik
-    prediction = trained_models['Best Random Forest (Tuned)'].predict(input_data_scaled)[0]
+        # Lakukan prediksi menggunakan model terbaik
+        prediction = trained_models['Best Random Forest (Tuned)'].predict(input_data_scaled)[0]
 
-    st.success(f"Hasil Prediksi: {prediction}")
+        st.success(f"Hasil Prediksi: {prediction}")
 
 # --- BAGIAN VISUALISASI DATA ---
 st.header("Visualisasi Data")
@@ -210,67 +199,85 @@ st.markdown("""
 Berikut adalah visualisasi data yang dapat membantu Anda memahami distribusi tingkat obesitas.
 """)
 
-# Visualisasi distribusi target (menggunakan data_original_for_viz yang sudah bersih)
-plt.figure(figsize=(10, 5))
-sns.countplot(x='NObeyesdad', data=data_original_for_viz.copy())
-plt.title('Distribusi Tingkat Obesitas')
-plt.xticks(rotation=45, ha='right')
-plt.tight_layout()
-st.pyplot(plt)
+# Pastikan data untuk visualisasi tidak kosong
+if not data_original_for_viz.empty:
+    # Visualisasi distribusi target
+    plt.figure(figsize=(10, 5))
+    sns.countplot(x='NObeyesdad', data=data_original_for_viz.copy())
+    plt.title('Distribusi Tingkat Obesitas')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    st.pyplot(plt)
+    plt.close('all') # Tutup figur setelah ditampilkan
 
-# Visualisasi outlier dengan boxplot (menggunakan data_original_for_viz yang sudah bersih)
-plt.figure(figsize=(12, 6))
-sns.boxplot(data=data_original_for_viz[numeric_cols_for_viz], orient='h')
-plt.title('Boxplot untuk Deteksi Outlier (Setelah Pra-pemrosesan)')
-st.pyplot(plt)
+    # Visualisasi outlier dengan boxplot
+    # Pastikan juga ada kolom numerik yang valid untuk di-plot
+    if not numeric_cols_for_viz.empty and not data_original_for_viz[numeric_cols_for_viz].empty:
+        plt.figure(figsize=(12, 6))
+        sns.boxplot(data=data_original_for_viz[numeric_cols_for_viz], orient='h')
+        plt.title('Boxplot untuk Deteksi Outlier (Setelah Pra-pemrosesan)')
+        st.pyplot(plt)
+        plt.close('all') # Tutup figur setelah ditampilkan
+    else:
+        st.warning("Peringatan: Tidak dapat membuat Boxplot karena data kosong atau tidak ada kolom numerik yang valid setelah pra-pemrosesan.")
 
-# --- MENAMPILKAN DESKRIPSI DATA ---
-st.header("Deskripsi Data")
-# Ini sekarang akan menampilkan deskripsi data yang sudah dibersihkan
-st.write(data_original_for_viz.describe())
+    # --- MENAMPILKAN DESKRIPSI DATA ---
+    st.header("Deskripsi Data")
+    st.write(data_original_for_viz.describe())
+
+else:
+    st.warning("Peringatan: Data kosong atau terjadi masalah saat memuat/memproses data. Beberapa visualisasi dan deskripsi mungkin tidak tersedia.")
+
 
 # --- VISUALISASI PERBANDINGAN PERFORMA MODEL ---
 st.header("Perbandingan Performa Model")
 
-# Hitung akurasi model pada test set (menggunakan model yang sudah dilatih)
-accuracies_before = {}
-for name, model in trained_models.items():
-    if 'Best' not in name:
-        accuracies_before[name] = model.score(X_test, y_test)
+if trained_models and X_test.size > 0: # Pastikan model dilatih dan ada data test
+    # Hitung akurasi model pada test set
+    accuracies_before = {}
+    for name, model in trained_models.items():
+        if 'Best' not in name:
+            accuracies_before[name] = model.score(X_test, y_test)
 
-plt.figure(figsize=(10, 5))
-sns.barplot(x=list(accuracies_before.keys()), y=list(accuracies_before.values()))
-plt.title('Akurasi Model Sebelum Penyetelan Hyperparameter')
-plt.ylabel('Akurasi')
-plt.ylim(0, 1)
-plt.xticks(rotation=45, ha='right')
-plt.tight_layout()
-st.pyplot(plt)
+    plt.figure(figsize=(10, 5))
+    sns.barplot(x=list(accuracies_before.keys()), y=list(accuracies_before.values()))
+    plt.title('Akurasi Model Sebelum Penyetelan Hyperparameter')
+    plt.ylabel('Akurasi')
+    plt.ylim(0, 1)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    st.pyplot(plt)
+    plt.close('all') # Tutup figur setelah ditampilkan
 
-accuracies_after = {
-    'Best Random Forest (Tuned)': trained_models['Best Random Forest (Tuned)'].score(X_test, y_test)
-}
+    accuracies_after = {
+        'Best Random Forest (Tuned)': trained_models['Best Random Forest (Tuned)'].score(X_test, y_test)
+    }
 
-plt.figure(figsize=(10, 5))
-sns.barplot(x=list(accuracies_after.keys()), y=list(accuracies_after.values()))
-plt.title('Akurasi Model Setelah Penyetelan Hyperparameter')
-plt.ylabel('Akurasi')
-plt.ylim(0, 1)
-plt.xticks(rotation=45, ha='right')
-plt.tight_layout()
-st.pyplot(plt)
+    plt.figure(figsize=(10, 5))
+    sns.barplot(x=list(accuracies_after.keys()), y=list(accuracies_after.values()))
+    plt.title('Akurasi Model Setelah Penyetelan Hyperparameter')
+    plt.ylabel('Akurasi')
+    plt.ylim(0, 1)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    st.pyplot(plt)
+    plt.close('all') # Tutup figur setelah ditampilkan
 
-# Gabungkan akurasi sebelum dan sesudah tuning untuk plot gabungan
-combined_accuracies = {**accuracies_before, **accuracies_after}
+    # Gabungkan akurasi sebelum dan sesudah tuning untuk plot gabungan
+    combined_accuracies = {**accuracies_before, **accuracies_after}
 
-plt.figure(figsize=(12, 6))
-sns.barplot(x=list(combined_accuracies.keys()), y=list(combined_accuracies.values()))
-plt.title('Perbandingan Akurasi Model Sebelum dan Setelah Penyetelan Hyperparameter')
-plt.ylabel('Akurasi')
-plt.ylim(0, 1)
-plt.xticks(rotation=45, ha='right')
-plt.tight_layout()
-st.pyplot(plt)
+    plt.figure(figsize=(12, 6))
+    sns.barplot(x=list(combined_accuracies.keys()), y=list(combined_accuracies.values()))
+    plt.title('Perbandingan Akurasi Model Sebelum dan Setelah Penyetelan Hyperparameter')
+    plt.ylabel('Akurasi')
+    plt.ylim(0, 1)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    st.pyplot(plt)
+    plt.close('all') # Tutup figur setelah ditampilkan
+else:
+    st.warning("Peringatan: Tidak dapat menampilkan visualisasi perbandingan model karena model belum dilatih atau data uji kosong.")
+
 
 # --- KESIMPULAN ---
 st.header("Kesimpulan")
