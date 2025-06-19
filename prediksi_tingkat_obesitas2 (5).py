@@ -20,14 +20,19 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
 
-# --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN DAN VISIBILITAS FONT) ---
+# --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN DAN VISIBILITAS FONT YANG JELAS) ---
 st.html("""
 <style>
-    /* Warna primer: hijau sehat, latar belakang: putih, sekunder: hijau muda */
+    /* Tema Umum: Latar belakang putih bersih untuk kontras maksimal */
     .stApp {
-        background-color: #f0fdf4; /* Background putih kehijauan muda */
-        color: #1a202c; /* Teks lebih gelap untuk visibilitas yang lebih baik */
+        background-color: #FFFFFF; /* Latar belakang putih murni */
+        color: #333333; /* Teks default abu-abu gelap */
     }
+    /* Judul dan Sub-judul */
+    h1, h2, h3 {
+        color: #044A42; /* Hijau gelap yang mendalam */
+    }
+    /* Tombol */
     .stButton>button {
         background-color: #059669; /* Hijau tua */
         color: white;
@@ -41,42 +46,34 @@ st.html("""
     .stButton>button:hover {
         background-color: #047857; /* Hijau lebih gelap saat hover */
     }
-    /* Memastikan label input terlihat jelas */
+    /* Input Fields (Number Input, Selectbox, dll.) */
     .stNumberInput label, .stSelectbox label, .stTextInput label, .stDateInput label {
-        color: #065f46; /* Warna hijau gelap untuk label input */
+        color: #044A42; /* Warna hijau gelap untuk label input */
         font-weight: bold; /* Membuat label lebih tebal */
     }
-    .stSelectbox>div>div {
+    .stSelectbox>div>div, .stNumberInput>div>div {
         border-radius: 8px;
         border: 1px solid #d1d5db; /* Border abu-abu */
     }
-    .stNumberInput>div>div {
-        border-radius: 8px;
-        border: 1px solid #d1d5db; /* Border abu-abu */
-    }
-    h1, h2, h3 {
-        color: #065f46; /* Hijau gelap untuk judul */
-    }
-    /* Perbaikan untuk kotak hasil prediksi (st.success) */
+    /* Kotak Hasil Prediksi (st.success) */
     .stSuccess {
         background-color: #d1fae5; /* Background hijau muda untuk sukses */
         color: #1a202c; /* Teks sangat gelap, hampir hitam */
-        border-radius: 12px; /* Border radius lebih besar */
-        padding: 20px; /* Padding lebih besar */
-        font-size: 1.8em; /* Ukuran font lebih besar lagi */
-        font-weight: 900; /* Extra bold */
-        text-align: center; /* Teks di tengah */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* Bayangan lebih kuat */
-        border: 2px solid #059669; /* Border hijau tebal */
-        /* === TAMBAHAN UNTUK EFEK TEPI GARIS FONT === */
+        border-radius: 12px;
+        padding: 20px;
+        font-size: 1.8em;
+        font-weight: 900;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        border: 2px solid #059669;
+        /* Efek Tepi Garis Font (Outline) */
         text-shadow:
-            -1px -1px 0 #ffffff, /* outline putih ke atas-kiri */
-             1px -1px 0 #ffffff, /* outline putih ke atas-kanan */
-            -1px  1px 0 #ffffff, /* outline putih ke bawah-kiri */
-             1px  1px 0 #ffffff; /* outline putih ke bawah-kanan */
-        /* Dengan empat bayangan ini, teks akan memiliki garis tepi putih tipis */
+            -1px -1px 0 #ffffff,
+             1px -1px 0 #ffffff,
+            -1px  1px 0 #ffffff,
+             1px  1px 0 #ffffff;
     }
-    /* Styling untuk keterangan hasil prediksi yang lebih detail */
+    /* Kotak Keterangan Detail Prediksi */
     .prediction-detail-box {
         background-color: #e0f2f7; /* Background biru muda */
         padding: 15px;
@@ -91,12 +88,24 @@ st.html("""
     .prediction-detail-box strong {
         color: #00332c;
     }
-
+    /* Kotak Peringatan (st.warning) */
     .stWarning {
-        background-color: #fef3c7; /* Background kuning muda untuk peringatan */
+        background-color: #fef3c7;
         color: #92400e;
         border-radius: 8px;
         padding: 10px;
+    }
+    /* Kotak Informasi dan Penjelasan Visualisasi */
+    div[data-testid="stMarkdownContainer"] > div > div {
+        background-color: #f5f5f5; /* Background abu-abu muda */
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        color: #4b5563; /* Teks abu-abu gelap */
+    }
+    div[data-testid="stMarkdownContainer"] > div > div p {
+        font-size: 0.9em;
+        color: #4b5563;
     }
     /* Mengatur lebar container utama */
     .block-container {
@@ -109,7 +118,7 @@ st.html("""
 """)
 
 # --- LOGO APLIKASI ---
-st.image("https://raw.githubusercontent.com/streamlit/docs/main/docs/static/logo.svg", width=150) # Placeholder logo Streamlit
+st.image("https://raw.githubusercontent.com/streamlit/docs/main/docs/static/logo.svg", width=150)
 
 
 # --- Judul dan Deskripsi Aplikasi ---
@@ -125,23 +134,19 @@ if 'prediction_made' not in st.session_state:
     st.session_state.prediction_made = False
 
 # --- PEMUATAN DATA DAN PRA-PEMROSESAN (HANYA SEKALI DI AWAL) ---
-@st.cache_data # Menggunakan cache_data untuk menghindari pemrosesan ulang setiap kali interaksi Streamlit
+@st.cache_data
 def load_and_preprocess_data(file_path):
     data = pd.read_csv(file_path)
 
-    # Coerce problematic columns to numeric, setting errors to NaN
     columns_to_coerce = ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']
     for col in columns_to_coerce:
         data[col] = pd.to_numeric(data[col], errors='coerce')
 
-    # Tangani nilai yang hilang dengan mengisi median untuk kolom numerik saja
     numeric_cols = data.select_dtypes(include=np.number).columns
     data[numeric_cols] = data[numeric_cols].fillna(data[numeric_cols].median())
 
-    # Tangani duplikat
     data.drop_duplicates(inplace=True)
 
-    # Tangani outlier menggunakan IQR untuk kolom 'Weight'
     Q1_weight = data['Weight'].quantile(0.25)
     Q3_weight = data['Weight'].quantile(0.75)
     IQR_weight = Q3_weight - Q1_weight
@@ -152,7 +157,6 @@ def load_and_preprocess_data(file_path):
         st.warning(f"Peringatan: Setelah penghapusan outlier, dataset menjadi kosong dari {initial_rows} baris. Visualisasi mungkin tidak tersedia.")
         return pd.DataFrame(), np.array([]), np.array([]), None, [], []
 
-    # Lakukan get_dummies pada seluruh data untuk memastikan konsistensi kolom
     full_data_encoded = pd.get_dummies(data, drop_first=True)
 
     target_columns_encoded = [col for col in full_data_encoded.columns if col.startswith('NObeyesdad_')]
@@ -160,14 +164,11 @@ def load_and_preprocess_data(file_path):
 
     target_labels_for_smote = full_data_encoded[target_columns_encoded].idxmax(axis=1).apply(lambda x: x.replace('NObeyesdad_', ''))
 
-    # Simpan daftar kolom fitur yang sudah di-one-hot-encoded
     all_training_features_columns = features.columns.tolist()
 
-    # Atasi ketidakseimbangan kelas data menggunakan SMOTE
     smote = SMOTE(random_state=42)
     features_resampled, target_resampled = smote.fit_resample(features, target_labels_for_smote)
 
-    # Normalisasi atau Standarisasi Data
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features_resampled)
 
@@ -177,9 +178,8 @@ def load_and_preprocess_data(file_path):
 data_original_for_viz, features_scaled, target_resampled, scaler, all_training_features_columns, numeric_cols_for_viz = load_and_preprocess_data('ObesityDataSet.csv')
 
 # --- PELATIHAN MODEL (Dijalankan sekali saat aplikasi dimulai) ---
-@st.cache_resource # Menggunakan cache_resource untuk menyimpan model yang dilatih
+@st.cache_resource
 def train_models(X_train_data, y_train_data):
-    # Inisialisasi model
     models = {
         'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
         'Random Forest': RandomForestClassifier(random_state=42),
@@ -191,7 +191,6 @@ def train_models(X_train_data, y_train_data):
         model.fit(X_train_data, y_train_data)
         trained_models[name] = model
 
-    # Hyperparameter Tuning untuk Random Forest
     param_grid = {
         'n_estimators': [50, 100],
         'max_depth': [None, 10, 20],
@@ -203,7 +202,7 @@ def train_models(X_train_data, y_train_data):
 
     return trained_models
 
-# Lakukan split data untuk pelatihan model, pastikan data tidak kosong
+# Lakukan split data untuk pelatihan model
 if features_scaled.size == 0:
     st.error("Data untuk pelatihan model kosong setelah pra-pemrosesan. Tidak dapat melatih model.")
     X_train, X_test, y_train, y_test = np.array([]), np.array([]), np.array([]), np.array([])
@@ -215,11 +214,8 @@ else:
 
 # --- BAGIAN INPUT DATA UNTUK PREDIKSI ---
 st.header("Input Data")
-# Menghapus parameter 'value' agar tidak ada nilai praterisi, akan default ke min_value
 age = st.number_input("🎂 Usia (tahun)", min_value=0, max_value=120)
-# Menambahkan opsi "Pilih..." di awal dan mengatur index ke 0
 gender = st.selectbox("🚻 Jenis Kelamin", ["Pilih...", "Laki-laki", "Perempuan"], index=0)
-# Satuan Tinggi Badan diubah ke sentimeter
 height_cm = st.number_input("📏 Tinggi Badan (cm)", min_value=50, max_value=250)
 weight = st.number_input("⚖️ Berat Badan (kg)", min_value=30, max_value=250)
 family_history = st.selectbox("👨‍👩‍👧‍👦 Riwayat keluarga kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
@@ -229,10 +225,11 @@ NCP = st.number_input("🍽️ Jumlah makan besar dalam sehari", min_value=1, ma
 SMOKE = st.selectbox("🚬 Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
 CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
 FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
-# Mengubah pilihan menjadi Bahasa Indonesia
 CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Selalu", "Sering", "Terkadang", "Tidak"], index=0)
 MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
-TUE = st.number_input("📱 Penggunaan gawai (jam): Durasi Anda menggunakan perangkat teknologi atau gawai (menonton TV, komputer, game)", min_value=0.0, max_value=24.0)
+# TUE diubah satuannya ke menit, dan label diperjelas
+TUE_menit = st.number_input("📱 Durasi penggunaan gawai (menit): Durasi Anda menggunakan perangkat teknologi atau gawai (menonton TV, komputer, game)", min_value=0, max_value=1440)
+
 
 # Tombol untuk memprediksi
 if st.button("Prediksi"):
@@ -247,6 +244,8 @@ if st.button("Prediksi"):
     else:
         # Konversi tinggi badan dari cm ke meter
         height_m = height_cm / 100.0
+        # Konversi durasi gawai dari menit ke jam
+        TUE_jam = TUE_menit / 60.0
 
         # Buat DataFrame input dari data yang dimasukkan pengguna
         input_data_df = pd.DataFrame([{
@@ -263,7 +262,7 @@ if st.button("Prediksi"):
             'CH2O': CH2O,
             'family_history_with_overweight': family_history,
             'FAF': FAF,
-            'TUE': TUE,
+            'TUE': TUE_jam, # Gunakan TUE dalam jam
             'CAEC': CAEC,
             'MTRANS': MTRANS
         }])
@@ -294,7 +293,7 @@ if st.button("Prediksi"):
         prediction = trained_models['Best Random Forest (Tuned)'].predict(input_data_scaled)[0]
 
         # Mapping hasil prediksi ke Bahasa Indonesia
-        # Kunci-kunci ini harus sesuai PERSIS dengan output string model
+        # Kunci-kunci ini harus sesuai PERSIS dengan output string model (dengan underscore)
         prediction_mapping = {
             "Normal_Weight": "Berat Badan Normal",
             "Overweight_Level_I": "Kelebihan Berat Badan Tingkat I",
@@ -306,7 +305,7 @@ if st.button("Prediksi"):
         }
         translated_prediction = prediction_mapping.get(prediction, "Tidak Diketahui") # Fallback to "Tidak Diketahui" if not found
 
-        st.success(f"Hasil Prediksi: {translated_prediction}")
+        st.success(f"✨ Hasil Prediksi: {translated_prediction}") # Tambah emoji di sini
 
         # Keterangan hasil yang didapat setelah diprediksi
         if translated_prediction == "Berat Badan Normal":
@@ -508,7 +507,7 @@ if st.session_state.prediction_made:
 
 
 # --- KESIMPULAN ---
-st.header("Kesimpulan")
+st.header("Keterangan")
 st.markdown("""
 Aplikasi ini memberikan estimasi tingkat obesitas berdasarkan input yang diberikan.
 Silakan masukkan data Anda untuk melihat hasil prediksi.
