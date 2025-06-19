@@ -20,13 +20,81 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
 
-# --- Konfigurasi Awal Aplikasi Streamlit ---
+# --- PENGATURAN TAMPILAN UI (TEMA KESEHATAN) ---
+# Menggunakan HTML/CSS untuk kustomisasi dasar tema kesehatan
+st.html("""
+<style>
+    /* Warna primer: hijau sehat, latar belakang: putih, sekunder: hijau muda */
+    .stApp {
+        background-color: #f0fdf4; /* Background putih kehijauan muda */
+        color: #1f2937; /* Teks gelap */
+    }
+    .stButton>button {
+        background-color: #059669; /* Hijau tua */
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #047857; /* Hijau lebih gelap saat hover */
+    }
+    .stSelectbox>div>div {
+        border-radius: 8px;
+        border: 1px solid #d1d5db; /* Border abu-abu */
+    }
+    .stNumberInput>div>div {
+        border-radius: 8px;
+        border: 1px solid #d1d5db; /* Border abu-abu */
+    }
+    h1, h2, h3 {
+        color: #065f46; /* Hijau gelap untuk judul */
+    }
+    .stSuccess {
+        background-color: #d1fae5; /* Background hijau muda untuk sukses */
+        color: #065f46;
+        border-radius: 8px;
+        padding: 10px;
+    }
+    .stWarning {
+        background-color: #fef3c7; /* Background kuning muda untuk peringatan */
+        color: #92400e;
+        border-radius: 8px;
+        padding: 10px;
+    }
+    /* Mengatur lebar container utama */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 5%;
+        padding-right: 5%;
+    }
+</style>
+""")
+
+# --- LOGO APLIKASI ---
+# Ganti URL ini dengan URL logo Anda sendiri atau upload file logo ke folder proyek Anda
+# Contoh: Jika Anda memiliki 'logo_kesehatan.png' di folder yang sama:
+# from PIL import Image
+# image = Image.open('logo_kesehatan.png')
+# st.image(image, width=150)
+st.image("https://raw.githubusercontent.com/streamlit/docs/main/docs/static/logo.svg", width=150) # Placeholder logo Streamlit
+
+
+# --- Judul dan Deskripsi Aplikasi ---
 st.title("Aplikasi Prediksi Tingkat Obesitas")
 
 st.markdown("""
 Aplikasi ini digunakan untuk memprediksi tingkat obesitas berdasarkan data yang dimasukkan.
 Silakan isi informasi berikut:
 """)
+
+# --- Inisialisasi Session State untuk Kontrol Tampilan ---
+if 'prediction_made' not in st.session_state:
+    st.session_state.prediction_made = False
 
 # --- PEMUATAN DATA DAN PRA-PEMROSESAN (HANYA SEKALI DI AWAL) ---
 @st.cache_data # Menggunakan cache_data untuk menghindari pemrosesan ulang setiap kali interaksi Streamlit
@@ -50,12 +118,10 @@ def load_and_preprocess_data(file_path):
     Q3_weight = data['Weight'].quantile(0.75)
     IQR_weight = Q3_weight - Q1_weight
 
-    # Penting: Pastikan DataFrame tidak menjadi kosong setelah outlier removal
     initial_rows = data.shape[0]
     data = data[(data['Weight'] >= (Q1_weight - 1.5 * IQR_weight)) & (data['Weight'] <= (Q3_weight + 1.5 * IQR_weight))]
     if data.empty:
         st.warning(f"Peringatan: Setelah penghapusan outlier, dataset menjadi kosong dari {initial_rows} baris. Visualisasi mungkin tidak tersedia.")
-        # Mengembalikan nilai kosong/default yang dapat ditangani oleh fungsi berikutnya
         return pd.DataFrame(), np.array([]), np.array([]), None, [], []
 
     # Lakukan get_dummies pada seluruh data untuk memastikan konsistensi kolom
@@ -110,14 +176,12 @@ def train_models(X_train_data, y_train_data):
     return trained_models
 
 # Lakukan split data untuk pelatihan model, pastikan data tidak kosong
-if features_scaled.size == 0: # Check if it's an empty numpy array
+if features_scaled.size == 0:
     st.error("Data untuk pelatihan model kosong setelah pra-pemrosesan. Tidak dapat melatih model.")
-    # Inisialisasi variabel yang diperlukan agar bagian kode selanjutnya tidak error
     X_train, X_test, y_train, y_test = np.array([]), np.array([]), np.array([]), np.array([])
-    trained_models = {} # Set models to empty if no training possible
+    trained_models = {}
 else:
     X_train, X_test, y_train, y_test = train_test_split(features_scaled, target_resampled, test_size=0.2, random_state=42)
-    # Latih model
     trained_models = train_models(X_train, y_train)
 
 
@@ -127,7 +191,8 @@ st.header("Input Data")
 age = st.number_input("Usia (tahun)", min_value=0, max_value=120)
 # Menambahkan opsi "Pilih..." di awal dan mengatur index ke 0
 gender = st.selectbox("Jenis Kelamin", ["Pilih...", "Male", "Female"], index=0)
-height = st.number_input("Tinggi Badan (m)", min_value=0.5, max_value=2.5)
+# Satuan Tinggi Badan diubah ke sentimeter
+height_cm = st.number_input("Tinggi Badan (cm)", min_value=50, max_value=250)
 weight = st.number_input("Berat Badan (kg)", min_value=30, max_value=250)
 family_history = st.selectbox("Apakah ada riwayat keluarga yang mengalami kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
 FAVC = st.selectbox("Sering mengonsumsi makanan tinggi kalori?", ["Pilih...", "Ya", "Tidak"], index=0)
@@ -142,17 +207,23 @@ TUE = st.number_input("Penggunaan gawai (jam)", min_value=0.0, max_value=24.0)
 
 # Tombol untuk memprediksi
 if st.button("Prediksi"):
+    # Set session state untuk menampilkan visualisasi
+    st.session_state.prediction_made = True
+
     # Validasi input untuk selectbox yang memiliki "Pilih..."
     if "Pilih..." in [gender, family_history, FAVC, SMOKE, CAEC, MTRANS]:
         st.warning("Mohon lengkapi semua pilihan yang tersedia.")
     elif not trained_models:
         st.error("Model belum dilatih karena data kosong atau terjadi error.")
     else:
+        # Konversi tinggi badan dari cm ke meter
+        height_m = height_cm / 100.0
+
         # Buat DataFrame input dari data yang dimasukkan pengguna
         input_data_df = pd.DataFrame([{
             'Age': age,
             'Gender': gender,
-            'Height': height,
+            'Height': height_m, # Gunakan tinggi badan dalam meter
             'Weight': weight,
             'CALC': 'Sometimes', # CALC, SCC harus diisi nilai default karena tidak ada input
             'FAVC': FAVC,
@@ -195,90 +266,150 @@ if st.button("Prediksi"):
 
         st.success(f"Hasil Prediksi: {prediction}")
 
-# --- BAGIAN VISUALISASI DATA ---
-st.header("Visualisasi Data")
-st.markdown("""
-Berikut adalah visualisasi data yang dapat membantu Anda memahami distribusi tingkat obesitas.
-""")
+        # Penjelasan di bawah hasil prediksi
+        st.markdown(f"""
+        <div style="background-color: #e0f2f7; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <p style="font-size: 1.1em; color: #004d40;">
+                **Hasil prediksi ini memberikan estimasi tingkat obesitas berdasarkan data yang Anda masukkan.**
+                Penting untuk diingat bahwa ini adalah model prediktif dan bukan diagnosis medis.
+                Selalu konsultasikan dengan profesional kesehatan untuk saran dan diagnosis yang akurat.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-# Pastikan data untuk visualisasi tidak kosong
-if not data_original_for_viz.empty:
-    # Visualisasi distribusi target
-    plt.figure(figsize=(10, 5))
-    sns.countplot(x='NObeyesdad', data=data_original_for_viz.copy())
-    plt.title('Distribusi Tingkat Obesitas')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    st.pyplot(plt)
-    plt.close('all') # Tutup figur setelah ditampilkan
 
-    # Visualisasi outlier dengan boxplot
-    # Pastikan juga ada kolom numerik yang valid untuk di-plot
-    if not numeric_cols_for_viz.empty and not data_original_for_viz[numeric_cols_for_viz].empty:
-        plt.figure(figsize=(12, 6))
-        sns.boxplot(data=data_original_for_viz[numeric_cols_for_viz], orient='h')
-        plt.title('Boxplot untuk Deteksi Outlier (Setelah Pra-pemrosesan)')
+# --- BAGIAN VISUALISASI DATA (Tampil setelah prediksi dibuat) ---
+if st.session_state.prediction_made:
+    st.header("Visualisasi Data")
+    st.markdown("""
+    Berikut adalah visualisasi data yang dapat membantu Anda memahami distribusi tingkat obesitas.
+    """)
+
+    # Pastikan data untuk visualisasi tidak kosong
+    if not data_original_for_viz.empty:
+        # Visualisasi distribusi target
+        plt.figure(figsize=(10, 5))
+        sns.countplot(x='NObeyesdad', data=data_original_for_viz.copy())
+        plt.title('Distribusi Tingkat Obesitas')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
         st.pyplot(plt)
         plt.close('all') # Tutup figur setelah ditampilkan
+        st.markdown("""
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <p style="font-size: 0.9em; color: #4b5563;">
+                <b>Penjelasan:</b> Diagram batang ini menunjukkan distribusi tingkat obesitas pada dataset yang digunakan untuk melatih model.
+                Ini membantu kita melihat proporsi masing-masing kategori berat badan (misalnya, Normal Weight, Overweight Level I, Obesity Type I, dll.).
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Visualisasi outlier dengan boxplot
+        if not numeric_cols_for_viz.empty and not data_original_for_viz[numeric_cols_for_viz].empty:
+            plt.figure(figsize=(12, 6))
+            sns.boxplot(data=data_original_for_viz[numeric_cols_for_viz], orient='h')
+            plt.title('Boxplot untuk Deteksi Outlier (Setelah Pra-pemrosesan)')
+            st.pyplot(plt)
+            plt.close('all') # Tutup figur setelah ditampilkan
+            st.markdown("""
+            <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                <p style="font-size: 0.9em; color: #4b5563;">
+                    <b>Penjelasan:</b> Boxplot ini menampilkan distribusi nilai pada kolom numerik (misalnya Usia, Tinggi Badan, Berat Badan) setelah pra-pemrosesan.
+                    Kotak menunjukkan kuartil (25-75%), garis di tengah adalah median, dan titik di luar kumis adalah outlier.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.warning("Peringatan: Tidak dapat membuat Boxplot karena data kosong atau tidak ada kolom numerik yang valid setelah pra-pemrosesan.")
+
+        # --- MENAMPILKAN DESKRIPSI DATA ---
+        st.header("Deskripsi Data")
+        st.write(data_original_for_viz.describe())
+        st.markdown("""
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <p style="font-size: 0.9em; color: #4b5563;">
+                <b>Penjelasan:</b> Tabel ini memberikan ringkasan statistik deskriptif dari dataset yang sudah diproses (jumlah, rata-rata, standar deviasi, nilai minimum/maksimum, dan kuartil).
+                Ini membantu memahami karakteristik dasar data.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
     else:
-        st.warning("Peringatan: Tidak dapat membuat Boxplot karena data kosong atau tidak ada kolom numerik yang valid setelah pra-pemrosesan.")
-
-    # --- MENAMPILKAN DESKRIPSI DATA ---
-    st.header("Deskripsi Data")
-    st.write(data_original_for_viz.describe())
-
-else:
-    st.warning("Peringatan: Data kosong atau terjadi masalah saat memuat/memproses data. Beberapa visualisasi dan deskripsi mungkin tidak tersedia.")
+        st.warning("Peringatan: Data kosong atau terjadi masalah saat memuat/memproses data. Beberapa visualisasi dan deskripsi mungkin tidak tersedia.")
 
 
-# --- VISUALISASI PERBANDINGAN PERFORMA MODEL ---
-st.header("Perbandingan Performa Model")
+    # --- VISUALISASI PERBANDINGAN PERFORMA MODEL ---
+    st.header("Perbandingan Performa Model")
 
-if trained_models and X_test.size > 0: # Pastikan model dilatih dan ada data test
-    # Hitung akurasi model pada test set
-    accuracies_before = {}
-    for name, model in trained_models.items():
-        if 'Best' not in name:
-            accuracies_before[name] = model.score(X_test, y_test)
+    if trained_models and X_test.size > 0:
+        # Hitung akurasi model pada test set
+        accuracies_before = {}
+        for name, model in trained_models.items():
+            if 'Best' not in name:
+                accuracies_before[name] = model.score(X_test, y_test)
 
-    plt.figure(figsize=(10, 5))
-    sns.barplot(x=list(accuracies_before.keys()), y=list(accuracies_before.values()))
-    plt.title('Akurasi Model Sebelum Penyetelan Hyperparameter')
-    plt.ylabel('Akurasi')
-    plt.ylim(0, 1)
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    st.pyplot(plt)
-    plt.close('all') # Tutup figur setelah ditampilkan
+        plt.figure(figsize=(10, 5))
+        sns.barplot(x=list(accuracies_before.keys()), y=list(accuracies_before.values()))
+        plt.title('Akurasi Model Sebelum Penyetelan Hyperparameter')
+        plt.ylabel('Akurasi')
+        plt.ylim(0, 1)
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        st.pyplot(plt)
+        plt.close('all')
+        st.markdown("""
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <p style="font-size: 0.9em; color: #4b5563;">
+                <b>Penjelasan:</b> Diagram batang ini membandingkan akurasi berbagai model klasifikasi (Regresi Logistik, Random Forest, SVM) pada data uji sebelum optimasi hyperparameter.
+                Akurasi menunjukkan seberapa sering model membuat prediksi yang benar.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    accuracies_after = {
-        'Best Random Forest (Tuned)': trained_models['Best Random Forest (Tuned)'].score(X_test, y_test)
-    }
+        accuracies_after = {
+            'Best Random Forest (Tuned)': trained_models['Best Random Forest (Tuned)'].score(X_test, y_test)
+        }
 
-    plt.figure(figsize=(10, 5))
-    sns.barplot(x=list(accuracies_after.keys()), y=list(accuracies_after.values()))
-    plt.title('Akurasi Model Setelah Penyetelan Hyperparameter')
-    plt.ylabel('Akurasi')
-    plt.ylim(0, 1)
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    st.pyplot(plt)
-    plt.close('all') # Tutup figur setelah ditampilkan
+        plt.figure(figsize=(10, 5))
+        sns.barplot(x=list(accuracies_after.keys()), y=list(accuracies_after.values()))
+        plt.title('Akurasi Model Setelah Penyetelan Hyperparameter')
+        plt.ylabel('Akurasi')
+        plt.ylim(0, 1)
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        st.pyplot(plt)
+        plt.close('all')
+        st.markdown("""
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <p style="font-size: 0.9em; color: #4b5563;">
+                <b>Penjelasan:</b> Diagram ini menunjukkan akurasi model Random Forest setelah penyetelan hyperparameter.
+                Penyetelan hyperparameter bertujuan untuk menemukan kombinasi parameter terbaik yang mengoptimalkan kinerja model.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Gabungkan akurasi sebelum dan sesudah tuning untuk plot gabungan
-    combined_accuracies = {**accuracies_before, **accuracies_after}
+        # Gabungkan akurasi sebelum dan sesudah tuning untuk plot gabungan
+        combined_accuracies = {**accuracies_before, **accuracies_after}
 
-    plt.figure(figsize=(12, 6))
-    sns.barplot(x=list(combined_accuracies.keys()), y=list(combined_accuracies.values()))
-    plt.title('Perbandingan Akurasi Model Sebelum dan Setelah Penyetelan Hyperparameter')
-    plt.ylabel('Akurasi')
-    plt.ylim(0, 1)
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    st.pyplot(plt)
-    plt.close('all') # Tutup figur setelah ditampilkan
-else:
-    st.warning("Peringatan: Tidak dapat menampilkan visualisasi perbandingan model karena model belum dilatih atau data uji kosong.")
+        plt.figure(figsize=(12, 6))
+        sns.barplot(x=list(combined_accuracies.keys()), y=list(combined_accuracies.values()))
+        plt.title('Perbandingan Akurasi Model Sebelum dan Setelah Penyetelan Hyperparameter')
+        plt.ylabel('Akurasi')
+        plt.ylim(0, 1)
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        st.pyplot(plt)
+        plt.close('all')
+        st.markdown("""
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <p style="font-size: 0.9em; color: #4b5563;">
+                <b>Penjelasan:</b> Diagram ini menyatukan perbandingan akurasi semua model, baik sebelum maupun setelah penyetelan hyperparameter (untuk Random Forest).
+                Ini memberikan gambaran komprehensif tentang seberapa baik setiap model bekerja dalam memprediksi tingkat obesitas.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.warning("Peringatan: Tidak dapat menampilkan visualisasi perbandingan model karena model belum dilatih atau data uji kosong.")
 
 
 # --- KESIMPULAN ---
