@@ -60,14 +60,31 @@ st.html("""
     /* Perbaikan untuk kotak hasil prediksi (st.success) */
     .stSuccess {
         background-color: #d1fae5; /* Background hijau muda untuk sukses */
-        color: #047857; /* Warna teks hijau lebih gelap agar mencolok */
+        color: #000000; /* Ganti warna teks menjadi hitam murni agar sangat kontras */
         border-radius: 12px; /* Border radius lebih besar */
         padding: 20px; /* Padding lebih besar */
-        font-size: 1.6em; /* Ukuran font lebih besar */
-        font-weight: 900; /* Lebih tebal */
+        font-size: 1.8em; /* Ukuran font lebih besar lagi */
+        font-weight: 900; /* Extra bold */
         text-align: center; /* Teks di tengah */
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Tambah bayangan */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* Bayangan lebih kuat */
+        border: 2px solid #059669; /* Border hijau tebal */
     }
+    /* Styling untuk keterangan hasil prediksi yang lebih detail */
+    .prediction-detail-box {
+        background-color: #e0f2f7; /* Background biru muda */
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border: 1px solid #a7d9f2;
+    }
+    .prediction-detail-box p {
+        font-size: 1.0em;
+        color: #004d40;
+    }
+    .prediction-detail-box strong {
+        color: #00332c;
+    }
+
     .stWarning {
         background-color: #fef3c7; /* Background kuning muda untuk peringatan */
         color: #92400e;
@@ -282,17 +299,70 @@ if st.button("Prediksi"):
 
         st.success(f"Hasil Prediksi: {translated_prediction}")
 
-        # Penjelasan di bawah hasil prediksi
-        st.markdown(f"""
-        <div style="background-color: #e0f2f7; padding: 15px; border-radius: 8px; margin-top: 20px;">
-            <p style="font-size: 1.1em; color: #004d40;">
-                **Hasil prediksi ini memberikan estimasi tingkat obesitas berdasarkan data yang Anda masukkan.**
-                Penting untuk diingat bahwa ini adalah model prediktif dan bukan diagnosis medis.
-                Selalu konsultasikan dengan profesional kesehatan untuk saran dan diagnosis yang akurat.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
+        # Keterangan hasil yang didapat setelah diprediksi
+        if translated_prediction == "Berat Badan Normal":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Berat Badan Normal**.</p>
+                <p>Ini berarti bobot Anda berada dalam kisaran yang sehat relatif terhadap tinggi badan Anda. Status ini umumnya dikaitkan dengan **risiko kesehatan yang rendah terkait obesitas**.</p>
+                <p>Pertahankan gaya hidup sehat dengan pola makan seimbang dan aktivitas fisik teratur.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif translated_prediction == "Kelebihan Berat Badan Tingkat I":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Kelebihan Berat Badan Tingkat I**.</p>
+                <p>Ini menunjukkan bahwa bobot Anda sedikit di atas kisaran normal. Kondisi ini dapat **meningkatkan risiko** beberapa masalah kesehatan jika tidak ditangani.</p>
+                <p>Disarankan untuk mulai mempertimbangkan perubahan gaya hidup, seperti meningkatkan aktivitas fisik dan mengatur pola makan.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif translated_prediction == "Kelebihan Berat Badan Tingkat II":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Kelebihan Berat Badan Tingkat II**.</p>
+                <p>Ini adalah tingkat kelebihan berat badan yang lebih signifikan dan **risiko kesehatan Anda meningkat**.</p>
+                <p>Sangat disarankan untuk mencari saran dari profesional kesehatan (dokter atau ahli gizi) untuk membuat rencana penurunan berat badan yang aman dan efektif.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif translated_prediction == "Obesitas Tipe I":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Obesitas Tipe I**.</p>
+                <p>Ini adalah kategori obesitas awal dan **risiko kesehatan Anda sudah cukup tinggi** terhadap berbagai penyakit terkait obesitas.</p>
+                <p>Konsultasi segera dengan dokter atau ahli gizi sangat dianjurkan untuk penanganan yang komprehensif.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif translated_prediction == "Obesitas Tipe II":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Obesitas Tipe II**.</p>
+                <p>Ini adalah tingkat obesitas yang lebih serius dengan **risiko kesehatan yang signifikan**. Kondisi ini memerlukan intervensi serius.</p>
+                <p>Penting untuk segera berkonsultasi dengan profesional kesehatan untuk diagnosis dan rencana penanganan yang tepat, mungkin termasuk manajemen medis dan gaya hidup intensif.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif translated_prediction == "Obesitas Tipe III":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Obesitas Tipe III**.</p>
+                <p>Ini adalah tingkat obesitas yang paling parah, juga dikenal sebagai obesitas morbid, dengan **risiko kesehatan yang sangat tinggi dan mengancam jiwa**.</p>
+                <p>Pencarian bantuan medis profesional dan penanganan yang agresif sangat krusial dan mendesak. Ini mungkin melibatkan tim medis multidisiplin.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        elif translated_prediction == "Berat Badan Kurang":
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Berat Badan Kurang**.</p>
+                <p>Ini berarti bobot Anda berada di bawah kisaran yang sehat relatif terhadap tinggi badan Anda. Kondisi ini juga dapat memiliki **risiko kesehatan** tersendiri.</p>
+                <p>Disarankan untuk berkonsultasi dengan profesional kesehatan untuk mengevaluasi penyebab berat badan kurang dan mendapatkan rekomendasi yang tepat untuk meningkatkan berat badan secara sehat.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="prediction-detail-box">
+                <p>Status Anda saat ini adalah **Tidak Diketahui**.</p>
+                <p>Terjadi kesalahan dalam menentukan kategori berat badan. Mohon periksa kembali input Anda atau hubungi dukungan.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- BAGIAN VISUALISASI DATA (Tampil setelah prediksi dibuat) ---
 if st.session_state.prediction_made:
