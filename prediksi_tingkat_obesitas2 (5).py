@@ -60,7 +60,7 @@ st.html("""
     /* Perbaikan untuk kotak hasil prediksi (st.success) */
     .stSuccess {
         background-color: #d1fae5; /* Background hijau muda untuk sukses */
-        color: #000000; /* Ganti warna teks menjadi hitam murni agar sangat kontras */
+        color: #1a202c; /* Teks sangat gelap, hampir hitam */
         border-radius: 12px; /* Border radius lebih besar */
         padding: 20px; /* Padding lebih besar */
         font-size: 1.8em; /* Ukuran font lebih besar lagi */
@@ -68,6 +68,13 @@ st.html("""
         text-align: center; /* Teks di tengah */
         box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* Bayangan lebih kuat */
         border: 2px solid #059669; /* Border hijau tebal */
+        /* === TAMBAHAN UNTUK EFEK TEPI GARIS FONT === */
+        text-shadow:
+            -1px -1px 0 #ffffff, /* outline putih ke atas-kiri */
+             1px -1px 0 #ffffff, /* outline putih ke atas-kanan */
+            -1px  1px 0 #ffffff, /* outline putih ke bawah-kiri */
+             1px  1px 0 #ffffff; /* outline putih ke bawah-kanan */
+        /* Dengan empat bayangan ini, teks akan memiliki garis tepi putih tipis */
     }
     /* Styling untuk keterangan hasil prediksi yang lebih detail */
     .prediction-detail-box {
@@ -222,9 +229,10 @@ NCP = st.number_input("🍽️ Jumlah makan besar dalam sehari", min_value=1, ma
 SMOKE = st.selectbox("🚬 Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
 CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
 FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
-CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Always", "Frequently", "Sometimes", "no"], index=0)
+# Mengubah pilihan menjadi Bahasa Indonesia
+CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Selalu", "Sering", "Terkadang", "Tidak"], index=0)
 MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
-TUE = st.number_input("📱 Penggunaan gawai (jam)", min_value=0.0, max_value=24.0)
+TUE = st.number_input("📱 Penggunaan gawai (jam): Durasi Anda menggunakan perangkat teknologi atau gawai (menonton TV, komputer, game)", min_value=0.0, max_value=24.0)
 
 # Tombol untuk memprediksi
 if st.button("Prediksi"):
@@ -286,16 +294,17 @@ if st.button("Prediksi"):
         prediction = trained_models['Best Random Forest (Tuned)'].predict(input_data_scaled)[0]
 
         # Mapping hasil prediksi ke Bahasa Indonesia
+        # Kunci-kunci ini harus sesuai PERSIS dengan output string model
         prediction_mapping = {
-            "Normal Weight": "Berat Badan Normal",
-            "Overweight Level I": "Kelebihan Berat Badan Tingkat I",
-            "Overweight Level II": "Kelebihan Berat Badan Tingkat II",
-            "Obesity Type I": "Obesitas Tipe I",
-            "Obesity Type II": "Obesitas Tipe II",
-            "Obesity Type III": "Obesitas Tipe III",
+            "Normal_Weight": "Berat Badan Normal",
+            "Overweight_Level_I": "Kelebihan Berat Badan Tingkat I",
+            "Overweight_Level_II": "Kelebihan Berat Badan Tingkat II",
+            "Obesity_Type_I": "Obesitas Tipe I",
+            "Obesity_Type_II": "Obesitas Tipe II",
+            "Obesity_Type_III": "Obesitas Tipe III",
             "Insufficient_Weight": "Berat Badan Kurang"
         }
-        translated_prediction = prediction_mapping.get(prediction, prediction) # Fallback to English if not found
+        translated_prediction = prediction_mapping.get(prediction, "Tidak Diketahui") # Fallback to "Tidak Diketahui" if not found
 
         st.success(f"Hasil Prediksi: {translated_prediction}")
 
@@ -498,38 +507,9 @@ if st.session_state.prediction_made:
         st.warning("Peringatan: Tidak dapat menampilkan visualisasi perbandingan model karena model belum dilatih atau data uji kosong.")
 
 
-# --- KETERANGAN LENGKAP OBESITAS ---
-st.header("💡 Mengenai Obesitas")
+# --- KESIMPULAN ---
+st.header("Kesimpulan")
 st.markdown("""
-Obesitas adalah kondisi medis kompleks yang ditandai oleh penumpukan lemak tubuh yang berlebihan hingga dapat mengganggu kesehatan. Ini bukan sekadar masalah estetika, melainkan penyakit kronis yang dapat meningkatkan risiko berbagai masalah kesehatan serius.
-
-**Penyebab Obesitas:**
-* **Asupan Kalori Berlebih:** Konsumsi makanan tinggi kalori, lemak, dan gula melebihi kebutuhan energi tubuh.
-* **Kurangnya Aktivitas Fisik:** Gaya hidup sedenter (kurang bergerak) mengurangi jumlah kalori yang dibakar.
-* **Faktor Genetik:** Keturunan dapat memengaruhi bagaimana tubuh menyimpan lemak dan seberapa efisien membakar kalori.
-* **Faktor Lingkungan dan Sosial:** Akses ke makanan tidak sehat, lingkungan yang tidak mendukung aktivitas fisik, dan kebiasaan keluarga.
-* **Faktor Hormonal dan Medis:** Kondisi seperti hipotiroidisme, sindrom Cushing, atau penggunaan obat-obatan tertentu.
-* **Faktor Psikologis:** Stres, kecemasan, dan depresi dapat memicu pola makan berlebihan.
-
-**Risiko Kesehatan Akibat Obesitas:**
-Obesitas meningkatkan risiko serius terhadap berbagai penyakit, antara lain:
-* Penyakit jantung (penyakit jantung koroner, gagal jantung)
-* Stroke
-* Diabetes Tipe 2
-* Tekanan darah tinggi (Hipertensi)
-* Kolesterol tinggi
-* Beberapa jenis kanker (usus besar, payudara, endometrium, ginjal, hati)
-* Gangguan tidur (sleep apnea)
-* Osteoarthritis (radang sendi)
-* Penyakit kandung empedu
-* Masalah kesuburan
-
-**Pencegahan dan Penanganan:**
-Pencegahan dan penanganan obesitas umumnya melibatkan kombinasi perubahan gaya hidup:
-* **Diet Seimbang:** Mengonsumsi makanan bergizi, kaya serat, rendah lemak jenuh, gula, dan garam.
-* **Aktivitas Fisik Teratur:** Berolahraga setidaknya 150 menit intensitas sedang per minggu.
-* **Perubahan Perilaku:** Membangun kebiasaan makan yang sehat, mengelola stres, dan tidur yang cukup.
-* **Konsultasi Medis:** Mencari saran dari dokter atau ahli gizi untuk rencana yang personal dan aman.
-
-Memahami dan mengelola berat badan adalah langkah penting untuk menjaga kesehatan jangka panjang.
-""", unsafe_allow_html=True)
+Aplikasi ini memberikan estimasi tingkat obesitas berdasarkan input yang diberikan.
+Silakan masukkan data Anda untuk melihat hasil prediksi.
+""")
