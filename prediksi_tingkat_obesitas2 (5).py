@@ -55,9 +55,8 @@ def load_and_preprocess_data(file_path):
     data = data[(data['Weight'] >= (Q1_weight - 1.5 * IQR_weight)) & (data['Weight'] <= (Q3_weight + 1.5 * IQR_weight))]
     if data.empty:
         st.warning(f"Peringatan: Setelah penghapusan outlier, dataset menjadi kosong dari {initial_rows} baris. Visualisasi mungkin tidak tersedia.")
-        # Jika data kosong, mungkin perlu strategi penanganan yang berbeda untuk menghindari error di tahap selanjutnya
-        # Misalnya, mengembalikan DataFrame kosong dan menanganinya di fungsi plotting
-        return pd.DataFrame(), [], [], None, [], [] # Mengembalikan nilai kosong/default
+        # Mengembalikan nilai kosong/default yang dapat ditangani oleh fungsi berikutnya
+        return pd.DataFrame(), np.array([]), np.array([]), None, [], []
 
     # Lakukan get_dummies pada seluruh data untuk memastikan konsistensi kolom
     full_data_encoded = pd.get_dummies(data, drop_first=True)
@@ -111,7 +110,7 @@ def train_models(X_train_data, y_train_data):
     return trained_models
 
 # Lakukan split data untuk pelatihan model, pastikan data tidak kosong
-if not isinstance(features_scaled, pd.DataFrame) and features_scaled.size == 0: # Check if it's an empty numpy array/list
+if features_scaled.size == 0: # Check if it's an empty numpy array
     st.error("Data untuk pelatihan model kosong setelah pra-pemrosesan. Tidak dapat melatih model.")
     # Inisialisasi variabel yang diperlukan agar bagian kode selanjutnya tidak error
     X_train, X_test, y_train, y_test = np.array([]), np.array([]), np.array([]), np.array([])
@@ -124,24 +123,29 @@ else:
 
 # --- BAGIAN INPUT DATA UNTUK PREDIKSI ---
 st.header("Input Data")
-age = st.number_input("Usia (tahun)", min_value=0, max_value=120, value=25)
-gender = st.selectbox("Jenis Kelamin", ["Male", "Female"])
-height = st.number_input("Tinggi Badan (m)", min_value=0.5, max_value=2.5, value=1.70)
-weight = st.number_input("Berat Badan (kg)", min_value=30, max_value=250, value=70)
-family_history = st.selectbox("Apakah ada riwayat keluarga yang mengalami kelebihan berat badan?", ["Ya", "Tidak"])
-FAVC = st.selectbox("Sering mengonsumsi makanan tinggi kalori?", ["Ya", "Tidak"])
-FCVC = st.number_input("Frekuensi mengonsumsi sayuran (dalam sekali makan)", min_value=1, max_value=5, value=2)
-NCP = st.number_input("Jumlah makan besar dalam sehari", min_value=1, max_value=10, value=3)
-SMOKE = st.selectbox("Apakah Anda merokok?", ["Ya", "Tidak"])
-CH2O = st.number_input("Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0, value=2.0)
-FAF = st.number_input("Frekuensi aktivitas fisik (dalam sekali seminggu)", min_value=0, max_value=7, value=1)
-CAEC = st.selectbox("Konsumsi makanan antara waktu makan utama", ["Always", "Frequently", "Sometimes", "no"])
-MTRANS = st.selectbox("Transportasi utama", ["Public_Transportation", "Automobile", "Walking", "Motorbike", "Bike"])
-TUE = st.number_input("Penggunaan gawai (jam)", min_value=0.0, max_value=24.0, value=1.0) # Contoh TUE, asumsikan numerik
+# Menghapus parameter 'value' agar tidak ada nilai praterisi, akan default ke min_value
+age = st.number_input("Usia (tahun)", min_value=0, max_value=120)
+# Menambahkan opsi "Pilih..." di awal dan mengatur index ke 0
+gender = st.selectbox("Jenis Kelamin", ["Pilih...", "Male", "Female"], index=0)
+height = st.number_input("Tinggi Badan (m)", min_value=0.5, max_value=2.5)
+weight = st.number_input("Berat Badan (kg)", min_value=30, max_value=250)
+family_history = st.selectbox("Apakah ada riwayat keluarga yang mengalami kelebihan berat badan?", ["Pilih...", "Ya", "Tidak"], index=0)
+FAVC = st.selectbox("Sering mengonsumsi makanan tinggi kalori?", ["Pilih...", "Ya", "Tidak"], index=0)
+FCVC = st.number_input("Frekuensi mengonsumsi sayuran (dalam sekali makan)", min_value=1, max_value=5)
+NCP = st.number_input("Jumlah makan besar dalam sehari", min_value=1, max_value=10)
+SMOKE = st.selectbox("Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], index=0)
+CH2O = st.number_input("Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
+FAF = st.number_input("Frekuensi aktivitas fisik (dalam sekali seminggu)", min_value=0, max_value=7)
+CAEC = st.selectbox("Konsumsi makanan antara waktu makan utama", ["Pilih...", "Always", "Frequently", "Sometimes", "no"], index=0)
+MTRANS = st.selectbox("Transportasi utama", ["Pilih...", "Public_Transportation", "Automobile", "Walking", "Motorbike", "Bike"], index=0)
+TUE = st.number_input("Penggunaan gawai (jam)", min_value=0.0, max_value=24.0)
 
 # Tombol untuk memprediksi
 if st.button("Prediksi"):
-    if not trained_models:
+    # Validasi input untuk selectbox yang memiliki "Pilih..."
+    if "Pilih..." in [gender, family_history, FAVC, SMOKE, CAEC, MTRANS]:
+        st.warning("Mohon lengkapi semua pilihan yang tersedia.")
+    elif not trained_models:
         st.error("Model belum dilatih karena data kosong atau terjadi error.")
     else:
         # Buat DataFrame input dari data yang dimasukkan pengguna
@@ -150,7 +154,7 @@ if st.button("Prediksi"):
             'Gender': gender,
             'Height': height,
             'Weight': weight,
-            'CALC': 'Sometimes', # CALC, SCC, TUE harus diisi nilai default atau input
+            'CALC': 'Sometimes', # CALC, SCC harus diisi nilai default karena tidak ada input
             'FAVC': FAVC,
             'FCVC': FCVC,
             'NCP': NCP,
@@ -164,7 +168,7 @@ if st.button("Prediksi"):
             'MTRANS': MTRANS
         }])
 
-        # Konversi kolom numerik di input_data_df yang mungkin masih object karena st.number_input
+        # Konversi kolom numerik di input_data_df
         for col in ['Age', 'Height', 'Weight', 'FCVC', 'NCP', 'CH2O', 'FAF', 'TUE']:
             input_data_df[col] = pd.to_numeric(input_data_df[col], errors='coerce')
 
@@ -173,11 +177,9 @@ if st.button("Prediksi"):
         input_data_encoded = pd.get_dummies(input_data_df, drop_first=True)
 
         # Sesuaikan kolom input_data_encoded dengan kolom fitur pelatihan
-        # Tambahkan kolom yang hilang dengan nilai 0
         for col in all_training_features_columns:
             if col not in input_data_encoded.columns:
                 input_data_encoded[col] = 0
-        # Hapus kolom yang tidak ada di data pelatihan
         for col in input_data_encoded.columns:
             if col not in all_training_features_columns:
                 input_data_encoded = input_data_encoded.drop(columns=[col])
