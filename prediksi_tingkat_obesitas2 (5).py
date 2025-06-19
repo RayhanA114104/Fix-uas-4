@@ -57,11 +57,16 @@ st.html("""
     h1, h2, h3 {
         color: #065f46; /* Hijau gelap untuk judul */
     }
+    /* Perbaikan untuk kotak hasil prediksi (st.success) */
     .stSuccess {
         background-color: #d1fae5; /* Background hijau muda untuk sukses */
-        color: #065f46;
-        border-radius: 8px;
-        padding: 10px;
+        color: #047857; /* Warna teks hijau lebih gelap agar mencolok */
+        border-radius: 12px; /* Border radius lebih besar */
+        padding: 20px; /* Padding lebih besar */
+        font-size: 1.6em; /* Ukuran font lebih besar */
+        font-weight: 900; /* Lebih tebal */
+        text-align: center; /* Teks di tengah */
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Tambah bayangan */
     }
     .stWarning {
         background-color: #fef3c7; /* Background kuning muda untuk peringatan */
@@ -189,7 +194,7 @@ st.header("Input Data")
 # Menghapus parameter 'value' agar tidak ada nilai praterisi, akan default ke min_value
 age = st.number_input("🎂 Usia (tahun)", min_value=0, max_value=120)
 # Menambahkan opsi "Pilih..." di awal dan mengatur index ke 0
-gender = st.selectbox("🚻 Jenis Kelamin", ["Pilih...", "Male", "Female"], index=0)
+gender = st.selectbox("🚻 Jenis Kelamin", ["Pilih...", "Laki-laki", "Perempuan"], index=0)
 # Satuan Tinggi Badan diubah ke sentimeter
 height_cm = st.number_input("📏 Tinggi Badan (cm)", min_value=50, max_value=250)
 weight = st.number_input("⚖️ Berat Badan (kg)", min_value=30, max_value=250)
@@ -201,7 +206,7 @@ SMOKE = st.selectbox("🚬 Apakah Anda merokok?", ["Pilih...", "Ya", "Tidak"], i
 CH2O = st.number_input("💧 Jumlah air yang Anda minum setiap hari (liter)", min_value=0.5, max_value=5.0)
 FAF = st.number_input("🏃‍♀️ Frekuensi aktivitas fisik (seminggu)", min_value=0, max_value=7)
 CAEC = st.selectbox("🍎 Konsumsi makanan antara waktu makan utama", ["Pilih...", "Always", "Frequently", "Sometimes", "no"], index=0)
-MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Public_Transportation", "Automobile", "Walking", "Motorbike", "Bike"], index=0)
+MTRANS = st.selectbox("🚌 Transportasi utama", ["Pilih...", "Transportasi Umum", "Mobil Pribadi", "Jalan Kaki", "Sepeda Motor", "Sepeda"], index=0)
 TUE = st.number_input("📱 Penggunaan gawai (jam)", min_value=0.0, max_value=24.0)
 
 # Tombol untuk memprediksi
@@ -263,7 +268,19 @@ if st.button("Prediksi"):
         # Lakukan prediksi menggunakan model terbaik
         prediction = trained_models['Best Random Forest (Tuned)'].predict(input_data_scaled)[0]
 
-        st.success(f"Hasil Prediksi: {prediction}")
+        # Mapping hasil prediksi ke Bahasa Indonesia
+        prediction_mapping = {
+            "Normal Weight": "Berat Badan Normal",
+            "Overweight Level I": "Kelebihan Berat Badan Tingkat I",
+            "Overweight Level II": "Kelebihan Berat Badan Tingkat II",
+            "Obesity Type I": "Obesitas Tipe I",
+            "Obesity Type II": "Obesitas Tipe II",
+            "Obesity Type III": "Obesitas Tipe III",
+            "Insufficient_Weight": "Berat Badan Kurang"
+        }
+        translated_prediction = prediction_mapping.get(prediction, prediction) # Fallback to English if not found
+
+        st.success(f"Hasil Prediksi: {translated_prediction}")
 
         # Penjelasan di bawah hasil prediksi
         st.markdown(f"""
@@ -298,7 +315,7 @@ if st.session_state.prediction_made:
         <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
             <p style="font-size: 0.9em; color: #4b5563;">
                 <b>Penjelasan:</b> Diagram batang ini menunjukkan distribusi tingkat obesitas pada dataset yang digunakan untuk melatih model.
-                Ini membantu kita melihat proporsi masing-masing kategori berat badan (misalnya, Normal Weight, Overweight Level I, Obesity Type I, dll.).
+                Ini membantu kita melihat proporsi masing-masing kategori berat badan (misalnya, Berat Badan Normal, Obesitas Tipe I, dll.).
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -411,9 +428,38 @@ if st.session_state.prediction_made:
         st.warning("Peringatan: Tidak dapat menampilkan visualisasi perbandingan model karena model belum dilatih atau data uji kosong.")
 
 
-# --- KESIMPULAN ---
-st.header("Kesimpulan")
+# --- KETERANGAN LENGKAP OBESITAS ---
+st.header("💡 Mengenai Obesitas")
 st.markdown("""
-Aplikasi ini memberikan estimasi tingkat obesitas berdasarkan input yang diberikan.
-Silakan masukkan data Anda untuk melihat hasil prediksi.
-""")
+Obesitas adalah kondisi medis kompleks yang ditandai oleh penumpukan lemak tubuh yang berlebihan hingga dapat mengganggu kesehatan. Ini bukan sekadar masalah estetika, melainkan penyakit kronis yang dapat meningkatkan risiko berbagai masalah kesehatan serius.
+
+**Penyebab Obesitas:**
+* **Asupan Kalori Berlebih:** Konsumsi makanan tinggi kalori, lemak, dan gula melebihi kebutuhan energi tubuh.
+* **Kurangnya Aktivitas Fisik:** Gaya hidup sedenter (kurang bergerak) mengurangi jumlah kalori yang dibakar.
+* **Faktor Genetik:** Keturunan dapat memengaruhi bagaimana tubuh menyimpan lemak dan seberapa efisien membakar kalori.
+* **Faktor Lingkungan dan Sosial:** Akses ke makanan tidak sehat, lingkungan yang tidak mendukung aktivitas fisik, dan kebiasaan keluarga.
+* **Faktor Hormonal dan Medis:** Kondisi seperti hipotiroidisme, sindrom Cushing, atau penggunaan obat-obatan tertentu.
+* **Faktor Psikologis:** Stres, kecemasan, dan depresi dapat memicu pola makan berlebihan.
+
+**Risiko Kesehatan Akibat Obesitas:**
+Obesitas meningkatkan risiko serius terhadap berbagai penyakit, antara lain:
+* Penyakit jantung (penyakit jantung koroner, gagal jantung)
+* Stroke
+* Diabetes Tipe 2
+* Tekanan darah tinggi (Hipertensi)
+* Kolesterol tinggi
+* Beberapa jenis kanker (usus besar, payudara, endometrium, ginjal, hati)
+* Gangguan tidur (sleep apnea)
+* Osteoarthritis (radang sendi)
+* Penyakit kandung empedu
+* Masalah kesuburan
+
+**Pencegahan dan Penanganan:**
+Pencegahan dan penanganan obesitas umumnya melibatkan kombinasi perubahan gaya hidup:
+* **Diet Seimbang:** Mengonsumsi makanan bergizi, kaya serat, rendah lemak jenuh, gula, dan garam.
+* **Aktivitas Fisik Teratur:** Berolahraga setidaknya 150 menit intensitas sedang per minggu.
+* **Perubahan Perilaku:** Membangun kebiasaan makan yang sehat, mengelola stres, dan tidur yang cukup.
+* **Konsultasi Medis:** Mencari saran dari dokter atau ahli gizi untuk rencana yang personal dan aman.
+
+Memahami dan mengelola berat badan adalah langkah penting untuk menjaga kesehatan jangka panjang.
+""", unsafe_allow_html=True)
